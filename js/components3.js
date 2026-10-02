@@ -77,7 +77,7 @@ function makeGate(kind) {
   return {
     name: GATE_NAMES[kind][0], en: GATE_NAMES[kind][1] + ' Gate', cat: 'logic', desig: 'U',
     terms: one ? [[-40, 0], [40, 0]] : [[-40, -20], [-40, 20], [40, 0]],
-    termNames: one ? ['输入 A', '输出 Y'] : ['输入 A', '输入 B', '输出 Y'],
+    termNames: one ? [_t('parts.input_a'), _t('parts.output_y')] : [_t('parts.input_a'), _t('parts.input_b'), _t('parts.output_y')],
     box: [-34, -24, 34, 24], props: [VDD_PROP], label: () => '',
     build(c, n, m) {
       const k = n.length - 1;
@@ -90,7 +90,7 @@ function makeGate(kind) {
       const k = c._nodes.length - 1, a = logicIn(c, 0, app.net), b = k > 1 ? logicIn(c, 1, app.net) : 0;
       c.state.out = [GATE_FN[kind](a, b)];
     },
-    readings(c) { const s = c.state, ins = (s.inb || []).map(b => b ? '1' : '0').join(' '); return [['输入 In', ins || '—'], ['输出 Out', s.out ? String(s.out[0]) : '—'], ['输出电压', U.fmt(c._m.V || 0, 'V')]]; },
+    readings(c) { const s = c.state, ins = (s.inb || []).map(b => b ? '1' : '0').join(' '); return [[_t('parts.inputs'), ins || '—'], [_t('parts.output'), s.out ? String(s.out[0]) : '—'], [_t('common.output_voltage'), U.fmt(c._m.V || 0, 'V')]]; },
     draw(ctx, c) {
       const st = c.state;
       if (one) { D.lead(ctx, -40, 0, -20, 0); } else { D.lead(ctx, -40, -20, -22, -20); D.lead(ctx, -40, 20, -22, 20); if (kind === 'xor' || kind === 'or' || kind === 'nor') { D.lead(ctx, -26, -20, -20, -20); D.lead(ctx, -26, 20, -20, 20); } }
@@ -134,8 +134,8 @@ Object.assign(DEFS, {
     },
     measure(c, m) { const n = c._nodes; c._m.V = m.v(n[2]); c._m.I = -(c._q.cur[3] || 0); c._m.Vd = m.v(n[1]) - m.v(n[0]); c._m.P = Math.abs(c._m.V * c._m.I); },
     readings(c) {
-      const m = c._m, P = c.props, sat = m.V > P.vpos - 0.3 ? '正饱和 +sat' : m.V < P.vneg + 0.3 ? '负饱和 −sat' : Math.abs(m.I) > 0.95 * P.imax ? '限流 current limit' : '线性区 linear';
-      return [['输出电压 Vout', U.fmt(m.V, 'V')], ['输出电流 Iout', U.fmt(Math.abs(m.I) < 1e-9 ? 0 : m.I, 'A')], ['差模输入 V+−V−', U.fmt(Math.abs(m.Vd) < 1e-9 ? 0 : m.Vd, 'V')], ['状态', sat]];
+      const m = c._m, P = c.props, sat = m.V > P.vpos - 0.3 ? _t('opamp.positive_saturation_sat') : m.V < P.vneg + 0.3 ? _t('opamp.negative_saturation_sat') : Math.abs(m.I) > 0.95 * P.imax ? _t('opamp.current_limit') : _t('opamp.linear');
+      return [[_t('common.output_voltage_vout'), U.fmt(m.V, 'V')], [_t('common.output_current_iout'), U.fmt(Math.abs(m.I) < 1e-9 ? 0 : m.I, 'A')], [_t('opamp.differential_input_v_v'), U.fmt(Math.abs(m.Vd) < 1e-9 ? 0 : m.Vd, 'V')], [_t('common.state'), sat]];
     },
     draw(ctx, c) {
       D.lead(ctx, -40, -20, -26, -20); D.lead(ctx, -40, 20, -26, 20); D.lead(ctx, 26, 0, 40, 0);
@@ -160,7 +160,7 @@ Object.assign(DEFS, {
     build(c, n, m) { c._p = logicOut(c, m, n[0], 0, () => (c.props.on ? (c.props.vdd || 5) / 25 : 0)); },
     measure(c, m) { c._m.V = m.v(c._nodes[0]); c._m.I = 0; c._m.P = 0; },
     click(c, app) { c.props.on = !c.props.on; app.changed(); app.refreshProps(); },
-    readings(c) { return [['输出', c.props.on ? '1 (高 H)' : '0 (低 L)'], ['输出电压', U.fmt(c._m.V || 0, 'V')]]; },
+    readings(c) { return [[_t('common.output'), c.props.on ? _t('common.1_high_h') : _t('common.0_low_l')], [_t('common.output_voltage'), U.fmt(c._m.V || 0, 'V')]]; },
     draw(ctx, c) {
       D.lead(ctx, 26, 0, 40, 0);
       ctx.fillStyle = D.vgrad(ctx, -16, 16, [[0, '#f4f6f8'], [1, '#c9d1da']]); D.rrect(ctx, -28, -16, 54, 32, 5); ctx.fill();
@@ -177,7 +177,7 @@ Object.assign(DEFS, {
     level(c, t) { const P = c.props, ph = t * P.f; return ph - Math.floor(ph) < Math.min(P.duty, 0.99) ? 1 : 0; },
     build(c, n, m) { c._p = logicOut(c, m, n[0], 0, (t) => DEFS.clock.level(c, t) * (c.props.vdd || 5) / 25); },
     measure(c, m, app) { c._m.V = m.v(c._nodes[0]); c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['输出电压', U.fmt(c._m.V || 0, 'V')], ['频率', U.fmt(c.props.f, 'Hz')]]; },
+    readings(c) { return [[_t('common.output_voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.frequency'), U.fmt(c.props.f, 'Hz')]]; },
     draw(ctx, c) {
       D.lead(ctx, 26, 0, 40, 0);
       ctx.fillStyle = D.vgrad(ctx, -16, 16, [[0, '#2f3a48'], [1, '#131a22']]); D.rrect(ctx, -28, -16, 54, 32, 5); ctx.fill();
@@ -194,7 +194,7 @@ Object.assign(DEFS, {
     build(c, n, m) { logicInputR(m, n[0]); c._p = null; },
     measure(c, m) { c._m.V = m.v(c._nodes[0]); c._m.I = 0; c._m.P = 0; },
     post(c, dt, app) { const v = app.net.v(c._nodes[0]), vdd = c.props.vdd || 5; c.state.lv = v > 0.6 * vdd ? 1 : v < 0.4 * vdd ? 0 : -1; },
-    readings(c) { const l = c.state.lv; return [['电平', l === 1 ? '1 (高 H)' : l === 0 ? '0 (低 L)' : '不确定 X'], ['电压', U.fmt(c._m.V || 0, 'V')]]; },
+    readings(c) { const l = c.state.lv; return [[_t('lprobe.level'), l === 1 ? _t('common.1_high_h') : l === 0 ? _t('common.0_low_l') : _t('lprobe.unknown_x')], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')]]; },
     draw(ctx, c) {
       D.lead(ctx, 0, 4, 0, 20);
       const l = c.state.lv;
@@ -244,7 +244,7 @@ Object.assign(DEFS, {
     build(c, n, m) { for (let i = 0; i < 4; i++) logicInputR(m, n[i]); c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
     post(c, dt, app) { let v = 0; for (let i = 0; i < 4; i++) v |= logicIn(c, i, app.net) << i; c.state.val = v; },
-    readings(c) { const v = c.state.val; return [['显示', v === undefined ? '—' : v.toString(16).toUpperCase() + '  (' + v + ')']]; },
+    readings(c) { const v = c.state.val; return [[_t('common.display'), v === undefined ? '—' : v.toString(16).toUpperCase() + '  (' + v + ')']]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.seg7.terms) D.lead(ctx, x, y, -30, y);
       ctx.fillStyle = '#15181c'; D.rrect(ctx, -30, -56, 64, 92, 5); ctx.fill();
@@ -305,7 +305,7 @@ Object.assign(DEFS, {
       if (!st.on && I > c.props.Ion) { st.on = true; app.dirty = true; st.clicks = (st.clicks || 0) + 1; }
       else if (st.on && I < c.props.Ioff) { st.on = false; app.dirty = true; st.clicks = (st.clicks || 0) + 1; }
     },
-    readings(c) { const Ic = Math.abs(c._p ? c._p.i : 0); return [['线圈电流', U.fmt(Ic < 1e-9 ? 0 : Ic, 'A')], ['触点电流', U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : Math.abs(c._m.I), 'A')], ['触点', c.state.on ? 'COM–NO 吸合 (energised)' : 'COM–NC 释放 (released)']]; },
+    readings(c) { const Ic = Math.abs(c._p ? c._p.i : 0); return [[_t('common.coil_current'), U.fmt(Ic < 1e-9 ? 0 : Ic, 'A')], [_t('relay.contact_current'), U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : Math.abs(c._m.I), 'A')], [_t('common.contacts'), c.state.on ? _t('relay.com_no_energized') : _t('relay.com_nc_released')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, -20, -28, -20); D.lead(ctx, -40, 20, -28, 20); D.lead(ctx, 28, 0, 40, 0); D.lead(ctx, 28, -20, 40, -20); D.lead(ctx, 28, 20, 40, 20);
       ctx.fillStyle = D.vgrad(ctx, -30, 30, [[0, '#4f8fe0'], [1, '#1f4f99']]); D.rrect(ctx, -30, -30, 60, 60, 5); ctx.fill();
@@ -330,7 +330,7 @@ Object.assign(DEFS, {
     label: (c) => U.fmtShort(c.props.R, 'Ω'),
     build(c, n, m) { c._p = m.addR(n[0], n[1], 1 / c.props.R); },
     post(c, dt, app) { const on = (c._m.V || 0) > c.props.Von; c.state.on = on; const want = on && !!c.props.sound && app.running; if (want !== !!c._osc) buzzerSound(c, want); c.state.ph = (c.state.ph || 0) + dt; },
-    readings(c) { return [['电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(Math.abs(c._m.I || 0), 'A')], ['状态', c.state.on ? '鸣响 ♪ ON' : '静音 OFF']]; },
+    readings(c) { return [[_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0), 'A')], [_t('common.state'), c.state.on ? _t('buzzer.sounding_on') : _t('buzzer.silent_off')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -16, 0); D.lead(ctx, 16, 0, 40, 0);
       ctx.fillStyle = D.vgrad(ctx, -16, 16, [[0, '#3a3a3a'], [1, '#0a0a0a']]); ctx.beginPath(); ctx.arc(0, 0, 16, 0, 7); ctx.fill();
@@ -356,7 +356,7 @@ Object.assign(DEFS, {
       c._p = m.addV(k, n[1], () => c.props.k * c.state.w, 0);
     },
     post(c, dt) { const P = c.props, st = c.state, I = c._p.i; st.w += dt * (P.k * I - P.b * st.w) / P.J; st.ang = ((st.ang || 0) + st.w * dt) % (2 * Math.PI); },
-    readings(c) { const w = c.state.w || 0; return [['转速', Math.round(w * 60 / (2 * Math.PI)) + ' rpm'], ['电流', U.fmt(c._m.I || 0, 'A')], ['电压', U.fmt(c._m.V || 0, 'V')], ['反电动势', U.fmt(c.props.k * w, 'V')], ['转矩', U.fmt(c.props.k * (c._m.I || 0), 'N·m')]]; },
+    readings(c) { const w = c.state.w || 0; return [[_t('common.speed'), Math.round(w * 60 / (2 * Math.PI)) + ' rpm'], [_t('common.current'), U.fmt(c._m.I || 0, 'A')], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('motor.back_emf'), U.fmt(c.props.k * w, 'V')], [_t('motor.torque'), U.fmt(c.props.k * (c._m.I || 0), 'N·m')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -26, 0); D.lead(ctx, 26, 0, 40, 0);
       ctx.fillStyle = D.vgrad(ctx, -22, 22, [[0, '#d9dee4'], [0.5, '#a3adb8'], [1, '#6c7784']]); D.rrect(ctx, -26, -20, 52, 40, 8); ctx.fill();
@@ -375,7 +375,7 @@ Object.assign(DEFS, {
     label: (c) => U.fmtShort(DEFS.ldr.R(c), 'Ω'),
     R(c) { const P = c.props, L = U.clamp(P.pos, 0, 1); return Math.exp(Math.log(P.Rdark) * (1 - L) + Math.log(P.Rlight) * L); },
     build(c, n, m) { c._p = m.addR(n[0], n[1], 1 / DEFS.ldr.R(c)); },
-    readings(c) { return [['光照', Math.round(c.props.pos * 100) + '%'], ['电阻', U.fmt(DEFS.ldr.R(c), 'Ω')], ['电压', U.fmt(Math.abs(c._m.V || 0), 'V')], ['电流', U.fmt(Math.abs(c._m.I || 0), 'A')]]; },
+    readings(c) { return [[_t('common.light'), Math.round(c.props.pos * 100) + '%'], [_t('common.resistor'), U.fmt(DEFS.ldr.R(c), 'Ω')], [_t('common.voltage'), U.fmt(Math.abs(c._m.V || 0), 'V')], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0), 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -14, 0); D.lead(ctx, 14, 0, 40, 0);
       const L = c.props.pos;
@@ -393,7 +393,7 @@ Object.assign(DEFS, {
     T(c) { return -20 + 120 * U.clamp(c.props.pos, 0, 1); },
     R(c) { const T = DEFS.ntc.T(c) + 273.15; return c.props.R25 * Math.exp(c.props.B * (1 / T - 1 / 298.15)); },
     build(c, n, m) { c._p = m.addR(n[0], n[1], 1 / DEFS.ntc.R(c)); },
-    readings(c) { return [['温度', DEFS.ntc.T(c).toFixed(1) + ' °C'], ['电阻', U.fmt(DEFS.ntc.R(c), 'Ω')], ['电压', U.fmt(Math.abs(c._m.V || 0), 'V')], ['电流', U.fmt(Math.abs(c._m.I || 0), 'A')]]; },
+    readings(c) { return [[_t('common.temperature'), DEFS.ntc.T(c).toFixed(1) + ' °C'], [_t('common.resistor'), U.fmt(DEFS.ntc.R(c), 'Ω')], [_t('common.voltage'), U.fmt(Math.abs(c._m.V || 0), 'V')], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0), 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -12, 0); D.lead(ctx, 12, 0, 40, 0);
       const f = c.props.pos;
@@ -421,7 +421,7 @@ Object.assign(DEFS, {
       const st = c.state; st.a = (st.a || 0) + dt; st.s1 = (st.s1 || 0) + c._m.V * c._m.V * dt; st.s2 = (st.s2 || 0) + c._m.V2 * c._m.V2 * dt;
       if (st.a >= (app.acWin || 0.2)) { st.r1 = Math.sqrt(st.s1 / st.a); st.r2 = Math.sqrt(st.s2 / st.a); st.a = st.s1 = st.s2 = 0; }
     },
-    readings(c) { const m = c._m, st = c.state; return [['初级电压 (瞬时/RMS)', U.fmt(m.V, 'V') + ' / ' + U.fmt(st.r1 || 0, 'V')], ['次级电压 (瞬时/RMS)', U.fmt(m.V2, 'V') + ' / ' + U.fmt(st.r2 || 0, 'V')], ['初级电流', U.fmt(m.I, 'A')], ['次级电流', U.fmt(m.I2, 'A')]]; },
+    readings(c) { const m = c._m, st = c.state; return [[_t('xfmr.primary_voltage_instant_rms'), U.fmt(m.V, 'V') + ' / ' + U.fmt(st.r1 || 0, 'V')], [_t('xfmr.secondary_voltage_instant_rms'), U.fmt(m.V2, 'V') + ' / ' + U.fmt(st.r2 || 0, 'V')], [_t('xfmr.primary_current'), U.fmt(m.I, 'A')], [_t('xfmr.secondary_current'), U.fmt(m.I2, 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, -20, -24, -20); D.lead(ctx, -40, 20, -24, 20); D.lead(ctx, 24, -20, 40, -20); D.lead(ctx, 24, 20, 40, 20);
       ctx.fillStyle = D.vgrad(ctx, -30, 30, [[0, '#8a939e'], [1, '#4c555f']]); ctx.fillRect(-5, -28, 10, 56);

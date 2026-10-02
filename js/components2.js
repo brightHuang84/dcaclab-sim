@@ -99,7 +99,7 @@ function drawScopeXY(ctx, c, x, y, w, h, big, fs) {
   }
   ctx.fillStyle = '#ffe14a'; ctx.fillText('X=CH1 ' + U.fmtShort(P.v1div, 'V') + '/div', x + 3, y + 2);
   ctx.fillStyle = '#39d0ff'; ctx.textAlign = 'right'; ctx.fillText('Y=CH2 ' + U.fmtShort(P.v2div, 'V') + '/div', x + w - 3, y + 2); ctx.textAlign = 'left';
-  ctx.fillStyle = '#9fe8b8'; ctx.textBaseline = 'bottom'; ctx.fillText('X-Y 模式', x + 3, y + h - 2); ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#9fe8b8'; ctx.textBaseline = 'bottom'; ctx.fillText(_t('parts.x_y_mode'), x + 3, y + h - 2); ctx.textBaseline = 'alphabetic';
 }
 // magnitude spectrum (Hann window, zero-padded radix-2 FFT); amplitude scaled to the sinusoid peak value
 function fftMag(sig, sdt) {
@@ -165,7 +165,7 @@ function drawScopeFFT(ctx, c, x, y, w, h, big, fs) {
   ctx.fillStyle = '#cfe'; ctx.fillText(big ? 'FFT 10dB/div top=+20dBV' : 'FFT 10dB/div', x + 3, y + 2);
   ctx.textAlign = 'right'; ctx.fillText(U.fmtShort(fmax / 10, 'Hz') + '/div', x + w - 3, y + 2); ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
-  if (F) { ctx.fillStyle = '#ffe14a'; ctx.fillText((big ? '峰值 ' : '') + U.fmt(F.p1.f, 'Hz', 3) + ' ' + U.fmt(F.p1.a, 'V', 3), x + 3, y + h - 2); }
+  if (F) { ctx.fillStyle = '#ffe14a'; ctx.fillText((big ? _t('parts.peak') : '') + U.fmt(F.p1.f, 'Hz', 3) + ' ' + U.fmt(F.p1.a, 'V', 3), x + 3, y + h - 2); }
   ctx.textBaseline = 'alphabetic';
 }
 
@@ -354,7 +354,7 @@ Object.assign(DEFS, {
         ctx.fillStyle = '#233'; ctx.font = 'bold 6.5px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, x, y + 17);
       };
       knob(78, -60, '#ffe14a', 'CH1 V/div'); knob(78, -22, '#39d0ff', 'CH2 V/div'); knob(78, 16, '#fff', 'TIME/div');
-      const lbl = (ctx) => { ctx.fillStyle = '#233'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('OSCILLOSCOPE 双通道示波器', 0, 0); };
+      const lbl = (ctx) => { ctx.fillStyle = '#233'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(_t('scope.oscilloscope_dual_channel'), 0, 0); };
       if (c.rot % 2) { ctx.save(); ctx.translate(-20, 47); if (c.rot === 3) ctx.rotate(Math.PI); lbl(ctx); ctx.restore(); } // runs along the narrow strip
       else D.upright(ctx, c, -20, 47, lbl);
       D.jack(ctx, -40, 60, '#ffd400'); D.jack(ctx, 0, 60, '#1fb8ff'); D.jack(ctx, 40, 60, '#222');

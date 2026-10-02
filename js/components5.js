@@ -121,8 +121,8 @@ const PRESETS = {
 };
 function addPartPreset(type, def) {
   const d = DEFS[type]; if (!d || !PRESETS[type]) return;
-  const opts = [['custom', '自定义 Custom']].concat(Object.keys(PRESETS[type]).map(k => [k, k]));
-  if (!d.props.some(p => p.k === 'part')) d.props.unshift({ k: 'part', label: '型号 Part No.', kind: 'select', opts, def: def || 'custom' });
+  const opts = [['custom', _t('parts.custom')]].concat(Object.keys(PRESETS[type]).map(k => [k, k]));
+  if (!d.props.some(p => p.k === 'part')) d.props.unshift({ k: 'part', label: _t('parts.part_no'), kind: 'select', opts, def: def || 'custom' });
   const oldOn = d.onProp;
   d.onProp = (c, k) => { if (oldOn) oldOn(c, k); if (k === 'part' && PRESETS[type][c.props.part]) { for (const [pk, v] of Object.entries(PRESETS[type][c.props.part])) if (d.props.some(p => p.k === pk)) c.props[pk] = v; } };
   const oldLabel = d.label;
@@ -167,14 +167,14 @@ const REG_PARTS = { '7805': [5, 2.0], '7809': [9, 2.0], '7812': [12, 2.0], '7815
 function regThermal(c, dt, app, Pd) {
   const st = c.state, Rth = c.props.heatsink ? 8 : 65;
   st.tj = st.tj === undefined ? 25 : st.tj; st.tj += (25 + Rth * Pd - st.tj) * Math.min(1, dt / (c.props.heatsink ? 20 : 5));
-  if (!st.hot && st.tj > 150) { st.hot = true; app.toast('🔥 ' + DEFS[c.type].name + ' 过热保护关断 (Tj > 150 °C)，请加散热片或减小压差/电流'); }
+  if (!st.hot && st.tj > 150) { st.hot = true; app.toast('🔥 ' + DEFS[c.type].name + _t('parts.thermal_shutdown_tj_150_c_add_a_heat')); }
   else if (st.hot && st.tj < 120) st.hot = false;
 }
 function regReadings(c, title) {
   const M = c._m, st = c.state, z = (v, e) => (Math.abs(v || 0) < e ? 0 : v || 0);
-  const status = st.hot ? '过热关断 Thermal shutdown' : M.x > 1.02 ? '限流 Current limit' : M.drop ? '压差不足 Dropout (Vin 太低)' : '稳压 Regulating';
-  return [['输入电压 Vin', U.fmt(z(M.Vin, 1e-6), 'V')], ['输出电压 Vout', U.fmt(z(M.Vout, 1e-6), 'V')], ['输出电流 Iout', U.fmt(z(M.Iout, 1e-7), 'A')],
-    ['输入电流 Iin', U.fmt(z(M.Iin, 1e-7), 'A')], ['耗散功率 Pd', U.fmt(z(M.P, 1e-7), 'W')], ['结温 Tj', (st.tj === undefined ? 25 : st.tj).toFixed(0) + ' °C' + (c.props.heatsink ? ' (散热片)' : ' (无散热片)')], ['状态', status]].concat(title ? [['说明', title]] : []);
+  const status = st.hot ? _t('parts.thermal_shutdown') : M.x > 1.02 ? _t('parts.current_limit') : M.drop ? _t('parts.dropout_vin_too_low') : _t('parts.regulating');
+  return [[_t('common.input_voltage_vin'), U.fmt(z(M.Vin, 1e-6), 'V')], [_t('common.output_voltage_vout'), U.fmt(z(M.Vout, 1e-6), 'V')], [_t('common.output_current_iout'), U.fmt(z(M.Iout, 1e-7), 'A')],
+    [_t('common.input_current_iin'), U.fmt(z(M.Iin, 1e-7), 'A')], [_t('parts.power_dissipation_pd'), U.fmt(z(M.P, 1e-7), 'W')], [_t('parts.junction_temp_tj'), (st.tj === undefined ? 25 : st.tj).toFixed(0) + ' °C' + (c.props.heatsink ? _t('parts.heatsink') : _t('parts.no_heatsink'))], [_t('common.state'), status]].concat(title ? [[_t('common.note'), title]] : []);
 }
 function regMeasure(c, m, iIn, iOut, iRef) {   // node indices of IN, OUT, REF (GND / ADJ)
   const n = c._nodes, p = c._q, M = c._m;
@@ -199,7 +199,7 @@ Object.assign(DEFS, {
     },
     measure(c, m) { regMeasure(c, m, 0, 2, 1); },
     post(c, dt, app) { regThermal(c, dt, app, c._m.P || 0); },
-    readings(c) { return regReadings(c, 'IN ≥ Vout + ' + (REG_PARTS[c.props.part] || [0, 2])[1] + ' V 才能稳压'); },
+    readings(c) { return regReadings(c, 'IN ≥ Vout + ' + (REG_PARTS[c.props.part] || [0, 2])[1] + _t('reg78xx.v_to_regulate')); },
     draw(ctx, c) { drawTO220(ctx, c, (c.props.part || '7805').replace(/^78/, 'L78'), 'I G O', c.state.hot ? '#6a2a1a' : '#1f1f1f'); if (c.props.heatsink) { ctx.fillStyle = 'rgba(160,170,180,0.9)'; for (let i = 0; i < 5; i++) ctx.fillRect(-18 + i * 8, -52, 4, 16); } },
   },
   lm317: {
@@ -221,7 +221,7 @@ Object.assign(DEFS, {
     label: (c) => (+c.props.n) + '×AA ' + U.fmtShort((+c.props.n) * DEFS.aaholder.cell(c)[0], 'V'),
     build(c, n, m) { const [v, r] = DEFS.aaholder.cell(c), N = +c.props.n || 1; c._p = m.addV(n[1], n[0], () => N * v, N * r); },
     measure(c, m) { c._m.I = -c._p.i; c._m.V = m.v(c._nodes[1]) - m.v(c._nodes[0]); c._m.P = c._m.V * c._m.I; },
-    readings(c) { const [v, r] = DEFS.aaholder.cell(c), N = +c.props.n || 1; return [['电动势 EMF', U.fmt(N * v, 'V')], ['内阻', U.fmt(N * r, 'Ω')], ['端电压', U.fmt(c._m.V || 0, 'V')], ['输出电流', U.fmt(c._m.I || 0, 'A')]]; },
+    readings(c) { const [v, r] = DEFS.aaholder.cell(c), N = +c.props.n || 1; return [[_t('aaholder.emf'), U.fmt(N * v, 'V')], [_t('common.internal_resistance'), U.fmt(N * r, 'Ω')], [_t('common.terminal_voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.output_current'), U.fmt(c._m.I || 0, 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -80, 0, -70, 0); D.lead(ctx, 70, 0, 80, 0);
       ctx.fillStyle = D.vgrad(ctx, -32, 32, [[0, '#3a3a3a'], [1, '#111']]); D.rrect(ctx, -70, -32, 140, 64, 5); ctx.fill();
@@ -239,7 +239,7 @@ Object.assign(DEFS, {
     emf(c) { return c.props.type === 'LR44' ? 1.5 : 3.0; },
     build(c, n, m) { c._p = m.addV(n[1], n[0], () => DEFS.coincell.emf(c), c.props.r); },
     measure(c, m) { c._m.I = -c._p.i; c._m.V = m.v(c._nodes[1]) - m.v(c._nodes[0]); c._m.P = c._m.V * c._m.I; },
-    readings(c) { return [['电动势', U.fmt(DEFS.coincell.emf(c), 'V')], ['内阻', U.fmt(c.props.r, 'Ω')], ['端电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(c._m.I || 0, 'A')]]; },
+    readings(c) { return [[_t('coincell.emf'), U.fmt(DEFS.coincell.emf(c), 'V')], [_t('common.internal_resistance'), U.fmt(c.props.r, 'Ω')], [_t('common.terminal_voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(c._m.I || 0, 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -24, 0); D.lead(ctx, 24, 0, 40, 0);
       const g = ctx.createRadialGradient(-6, -8, 2, 0, 0, 24); g.addColorStop(0, '#fafafa'); g.addColorStop(0.6, '#b9bec5'); g.addColorStop(1, '#7a8088');
@@ -256,7 +256,7 @@ Object.assign(DEFS, {
     build(c, n, m) { c._p = m.addV(n[1], n[0], () => ocv18650(DEFS.li18650.soc(c)), c.props.r); },
     measure(c, m) { c._m.I = -c._p.i; c._m.V = m.v(c._nodes[1]) - m.v(c._nodes[0]); c._m.P = c._m.V * c._m.I; },
     post(c, dt) { c.state.q = (c.state.q || 0) + c._m.I * dt; },
-    readings(c) { const s = DEFS.li18650.soc(c); return [['电量 SOC', (s * 100).toFixed(1) + ' %'], ['开路电压 OCV', U.fmt(ocv18650(s), 'V')], ['端电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(c._m.I || 0, 'A')], ['内阻', U.fmt(c.props.r, 'Ω')], ['已放电', U.fmt((c.state.q || 0) / 3.6, 'mAh')]]; },
+    readings(c) { const s = DEFS.li18650.soc(c); return [[_t('li18650.state_of_charge_soc'), (s * 100).toFixed(1) + ' %'], [_t('li18650.open_circuit_voltage_ocv'), U.fmt(ocv18650(s), 'V')], [_t('common.terminal_voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(c._m.I || 0, 'A')], [_t('common.internal_resistance'), U.fmt(c.props.r, 'Ω')], [_t('li18650.discharged'), U.fmt((c.state.q || 0) / 3.6, 'mAh')]]; },
     draw(ctx, c) {
       D.lead(ctx, -60, 0, -50, 0); D.lead(ctx, 50, 0, 60, 0);
       drawCell(ctx, 0, 0, 100, 32, '#2f6fb0', null, '18650  3.7V  ' + c.props.cap + 'mAh', c);
@@ -276,7 +276,7 @@ Object.assign(DEFS, {
       c._p = null;
     },
     measure(c, m) { const V = m.v(c._nodes[1]) - m.v(c._nodes[0]), P = c.props; c._m.V = V; c._m.I = P.Isc * U.clamp(P.pos, 0, 1) - c._q.i - V / (Math.max(1, P.Ns) * 200); c._m.P = V * c._m.I; },
-    readings(c) { return [['光照', Math.round(c.props.pos * 100) + ' %'], ['电压', U.fmt(c._m.V || 0, 'V')], ['输出电流', U.fmt(c._m.I || 0, 'A')], ['输出功率', U.fmt(c._m.P || 0, 'W')], ['满光照 Voc / Isc', U.fmt(c.props.Voc, 'V') + ' / ' + U.fmt(c.props.Isc, 'A')]]; },
+    readings(c) { return [[_t('common.light'), Math.round(c.props.pos * 100) + ' %'], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.output_current'), U.fmt(c._m.I || 0, 'A')], [_t('common.output_power'), U.fmt(c._m.P || 0, 'W')], [_t('solar.full_light_voc_isc'), U.fmt(c.props.Voc, 'V') + ' / ' + U.fmt(c.props.Isc, 'A')]]; },
     draw(ctx, c) {
       D.lead(ctx, -60, 40, -50, 36); D.lead(ctx, 60, 40, 50, 36);
       ctx.fillStyle = '#c9ced6'; D.rrect(ctx, -56, -38, 112, 76, 3); ctx.fill();
@@ -305,7 +305,7 @@ Object.assign(DEFS, {
       if (!c._q) { c._m.I = 0; c._m.cc = false; c._m.P = 0; return; }
       const L = softLimit((c.props.V - V) / 0.001, (c.props.V - V) >= 0 ? c.props.I : c.props.I * 0.02); c._m.I = L.I; c._m.cc = L.x > 1.02; c._m.P = V * L.I;
     },
-    readings(c) { return [['模式', !c.props.on ? '输出关闭 OFF' : c._m.cc ? 'CC 恒流 (已限流)' : 'CV 恒压'], ['输出电压', U.fmt(c._m.V || 0, 'V')], ['输出电流', U.fmt(c._m.I || 0, 'A')], ['输出功率', U.fmt(c._m.P || 0, 'W')], ['设定', U.fmt(c.props.V, 'V') + ' / ' + U.fmt(c.props.I, 'A')]]; },
+    readings(c) { return [[_t('psu.mode'), !c.props.on ? _t('psu.output_off') : c._m.cc ? _t('psu.cc_constant_current_limiting') : _t('psu.cv_constant_voltage')], [_t('common.output_voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.output_current'), U.fmt(c._m.I || 0, 'A')], [_t('common.output_power'), U.fmt(c._m.P || 0, 'W')], [_t('psu.setpoint'), U.fmt(c.props.V, 'V') + ' / ' + U.fmt(c.props.I, 'A')]]; },
     draw(ctx, c, env) {
       D.lead(ctx, -20, 50, -20, 40); D.lead(ctx, 20, 50, 20, 40);
       ctx.fillStyle = D.vgrad(ctx, -50, 44, [[0, '#e9ecef'], [1, '#aeb4bb']]); D.rrect(ctx, -70, -50, 140, 94, 6); ctx.fill();
@@ -339,18 +339,18 @@ Object.assign(DEFS, {
     },
     status(c) {
       const M = c._m, st = c.state;
-      if (st.hot) return '过热保护 Thermal shutdown';
-      if (!(M.en > 0.5)) return st.brown ? '输入功率不足 Brown-out' : '输入过低 UVLO (Vin < ' + U.fmtShort(c.props.Vmin, 'V') + ')';
-      if (st.ol || M.x > 1.05) return '过流 限流/折返 Over-current';
-      if (M.pass) return '压差不足 Dropout (Vin < Vout + 1.5 V)';
-      return '正常 Regulating';
+      if (st.hot) return _t('common.thermal_shutdown');
+      if (!(M.en > 0.5)) return st.brown ? _t('buck.brown_out') : _t('common.input_too_low_uvlo_vin') + U.fmtShort(c.props.Vmin, 'V') + ')';
+      if (st.ol || M.x > 1.05) return _t('common.over_current_limit_foldback');
+      if (M.pass) return _t('buck.dropout_vin_vout_1_5_v');
+      return _t('common.regulating');
     },
-    readings(c) { const r = DEFS.boost.readings.call(DEFS.buck, c); r[7] = ['设定 Vset', U.fmt(DEFS.buck.vset(c), 'V')]; r[8] = ['状态', DEFS.buck.status(c)]; return r; },
+    readings(c) { const r = DEFS.boost.readings.call(DEFS.buck, c); r[7] = [_t('common.setpoint_vset'), U.fmt(DEFS.buck.vset(c), 'V')]; r[8] = [_t('common.state'), DEFS.buck.status(c)]; return r; },
     post(c, dt, app) {
       const st = c.state, M = c._m; st.vo = M.Vout;
       if (st.ol) { if (M.x < 0.9) st.ol = false; } else if (M.x > 1.2 && M.en > 0.5) st.ol = true;
       st.heat = Math.max(0, (st.heat || 0) + dt * (st.ol ? 1 : -0.5));
-      if (!st.hot && st.heat > 3) { st.hot = true; app.toast('🔥 降压模块过热！持续过流，已热关断'); } else if (st.hot && st.heat < 1) st.hot = false;
+      if (!st.hot && st.heat > 3) { st.hot = true; app.toast(_t('buck.buck_module_overheated_sustained_ove')); } else if (st.hot && st.heat < 1) st.hot = false;
     },
     draw(ctx, c, env) {
       const st = c.state, M = c._m || {};
@@ -376,7 +376,7 @@ Object.assign(DEFS, {
         txt(ctx, 'LM2596 DC-DC BUCK', 0, 36, 'bold 7px sans-serif', '#f2f6ff');
         ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#f2f6ff'; ctx.fillText('IN+', -68, -32); ctx.fillText('IN−', -68, 32);
         ctx.textAlign = 'right'; ctx.fillText('OUT+', 68, -38); ctx.fillText('OUT−', 68, 32);
-        if (st.hot) txt(ctx, '🔥 过热', -40, 24, 'bold 8px sans-serif', '#ffdd33');
+        if (st.hot) txt(ctx, _t('common.hot'), -40, 24, 'bold 8px sans-serif', '#ffdd33');
       });
     },
   }),
@@ -404,12 +404,12 @@ Object.assign(DEFS, {
     post(c, dt, app) {
       const st = c.state, v = c._m.V; if (st.burnt) return;
       const rev = v < -1.0, ov = v > 1.15 * c.props.Vr;
-      if (rev && !st.warnRev) { st.warnRev = true; app.toast('⚠ 电解电容极性接反！(' + U.fmt(v, 'V', 3) + ') 请把 + 极接高电位'); }
-      if (ov && !st.warnOv) { st.warnOv = true; app.toast('⚠ 电解电容过压！' + U.fmt(v, 'V', 3) + ' > 额定 ' + U.fmt(c.props.Vr, 'V')); }
+      if (rev && !st.warnRev) { st.warnRev = true; app.toast(_t('ecap.electrolytic_capacitor_reversed') + U.fmt(v, 'V', 3) + _t('ecap.connect_the_lead_to_the_higher_poten')); }
+      if (ov && !st.warnOv) { st.warnOv = true; app.toast(_t('ecap.electrolytic_capacitor_over_voltage') + U.fmt(v, 'V', 3) + _t('ecap.rated') + U.fmt(c.props.Vr, 'V')); }
       st.stress = rev || ov ? (st.stress || 0) + dt * (rev ? Math.min(3, -v / 2) : 1) : Math.max(0, (st.stress || 0) - dt * 0.2);
-      if (st.stress > 0.5) { st.burnt = true; st.pop = rev ? 'rev' : 'ov'; app.dirty = true; app.toast('💥 电解电容' + (rev ? '反接' : '过压') + '爆浆！已损坏 (开路)'); }
+      if (st.stress > 0.5) { st.burnt = true; st.pop = rev ? 'rev' : 'ov'; app.dirty = true; app.toast(_t('ecap.electrolytic_capacitor') + (rev ? _t('ecap.reversed') : _t('ecap.over_voltage')) + _t('ecap.burst_damaged_open_circuit')); }
     },
-    readings(c) { const st = c.state, v = c._m.V || 0; return [['电容', U.fmt(c.props.C, 'F')], ['电压 (+ 对 −)', U.fmt(v, 'V')], ['额定电压', U.fmt(c.props.Vr, 'V')], ['状态', st.burnt ? '💥 已爆裂 (' + (st.pop === 'rev' ? '反接' : '过压') + ')' : v < -1 ? '⚠ 极性接反！' : v > 1.15 * c.props.Vr ? '⚠ 过压！' : '正常']]; },
+    readings(c) { const st = c.state, v = c._m.V || 0; return [[_t('common.capacitor'), U.fmt(c.props.C, 'F')], [_t('ecap.voltage_to'), U.fmt(v, 'V')], [_t('ecap.rated_voltage'), U.fmt(c.props.Vr, 'V')], [_t('common.state'), st.burnt ? _t('ecap.burst') + (st.pop === 'rev' ? _t('ecap.reversed') : _t('ecap.over_voltage')) + ')' : v < -1 ? _t('ecap.reversed_polarity') : v > 1.15 * c.props.Vr ? _t('ecap.over_voltage_585') : _t('common.normal')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -6, 0); D.lead(ctx, 40, 0, 6, 0); D.lead(ctx, -6, 0, -6, 4); D.lead(ctx, 6, 0, 6, 4);
       const burnt = c.state.burnt;
@@ -428,7 +428,7 @@ Object.assign(DEFS, {
     props: [{ k: 'C', label: '电容', unit: 'F', def: 100e-9, min: 1e-13 }, { k: 'Vr', label: '额定电压', unit: 'V', def: 50, min: 1 }],
     label: (c) => U.fmtShort(c.props.C, 'F') + ' (' + capCode(c.props.C) + ')',
     build(c, n, m) { c._p = m.addC(n[0], n[1], c.props.C, c.state); },
-    readings(c) { return [['电容', U.fmt(c.props.C, 'F') + ' (代码 ' + capCode(c.props.C) + ')'], ['电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(c._m.I || 0, 'A')]]; },
+    readings(c) { return [[_t('common.capacitor'), U.fmt(c.props.C, 'F') + _t('ccap.code') + capCode(c.props.C) + ')'], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(c._m.I || 0, 'A')]]; },
     draw(ctx, c) {
       D.poly(ctx, [[-40, 0], [-6, 0], [-6, -8]]); D.poly(ctx, [[40, 0], [6, 0], [6, -8]]);
       const g = ctx.createRadialGradient(-4, -22, 2, 0, -18, 14); g.addColorStop(0, '#f7d98a'); g.addColorStop(1, '#c98e2c');
@@ -439,11 +439,11 @@ Object.assign(DEFS, {
 
   // ======================= semiconductors =======================
   schottky: Object.assign({}, DEFS.diode, {
-    name: '肖特基二极管', en: 'Schottky Diode 1N5819', label: (c) => c.props.part && c.props.part !== 'custom' ? c.props.part : '肖特基',
+    name: '肖特基二极管', en: 'Schottky Diode 1N5819', label: (c) => c.props.part && c.props.part !== 'custom' ? c.props.part : _t('schottky.schottky'),
     draw(ctx, c) { drawAxial(ctx, c, '#1c1c1c', '#c9ccd1', c.props.part !== 'custom' ? c.props.part : ''); },
   }),
   rectifier: Object.assign({}, DEFS.diode, {
-    name: '整流二极管', en: 'Rectifier Diode 1N4007', label: (c) => c.props.part && c.props.part !== 'custom' ? c.props.part : '整流',
+    name: '整流二极管', en: 'Rectifier Diode 1N4007', label: (c) => c.props.part && c.props.part !== 'custom' ? c.props.part : _t('rectifier.rectifier'),
     draw(ctx, c) { drawAxial(ctx, c, '#1c1c1c', '#c9ccd1', c.props.part !== 'custom' ? c.props.part : ''); },
   }),
   sigdiode: Object.assign({}, DEFS.diode, {
@@ -461,7 +461,7 @@ Object.assign(DEFS, {
       c._d = [D2(n[1], n[0], 'd1'), D2(n[2], n[0], 'd2'), D2(n[3], n[1], 'd3'), D2(n[3], n[2], 'd4')]; c._p = null;
     },
     measure(c, m) { const n = c._nodes; c._m.V = m.v(n[0]) - m.v(n[3]); c._m.I = c._d[0].i + c._d[1].i; c._m.Vac = m.v(n[1]) - m.v(n[2]); c._m.P = c._d.reduce((s, d) => s + Math.abs(d.i * ((m.v(d.a) - m.v(d.bk)))), 0); },
-    readings(c) { return [['交流输入 (~ − ~)', U.fmt(c._m.Vac || 0, 'V')], ['直流输出 (+ − −)', U.fmt(c._m.V || 0, 'V')], ['输出电流', U.fmt(c._m.I || 0, 'A')], ['损耗', U.fmt(c._m.P || 0, 'W')]]; },
+    readings(c) { return [[_t('bridge.ac_input'), U.fmt(c._m.Vac || 0, 'V')], [_t('bridge.dc_output'), U.fmt(c._m.V || 0, 'V')], [_t('common.output_current'), U.fmt(c._m.I || 0, 'A')], [_t('bridge.loss'), U.fmt(c._m.P || 0, 'W')]]; },
     draw(ctx, c) {
       for (const [x] of DEFS.bridge.terms) D.lead(ctx, x, 40, x, 22);
       ctx.fillStyle = D.vgrad(ctx, -24, 24, [[0, '#3a3a3a'], [1, '#111']]); D.rrect(ctx, -48, -26, 96, 48, 3); ctx.fill();
@@ -472,7 +472,7 @@ Object.assign(DEFS, {
   rgbled: {
     name: 'RGB 三色 LED', en: 'RGB LED', cat: 'light', desig: 'LED', terms: [[-40, 20], [-20, 20], [0, 20], [20, 20]], termNames: ['R 红', '公共端 (长脚)', 'G 绿', 'B 蓝'], box: [-44, -44, 24, 20],
     props: [{ k: 'ca', label: '共阳极 (Common Anode)', kind: 'bool', def: false }, { k: 'Imax', label: '每色最大电流', unit: 'A', def: 0.03, min: 1e-4 }],
-    label: (c) => (c.props.ca ? '共阳' : '共阴') + ' RGB',
+    label: (c) => (c.props.ca ? _t('rgbled.ca') : _t('rgbled.cc')) + ' RGB',
     build(c, n, m) {
       if (c.state.burnt) { c._d = null; c._p = null; return; }
       const st = c.state, ch = [['r', 0], ['g', 2], ['b', 3]];
@@ -482,10 +482,10 @@ Object.assign(DEFS, {
     post(c, dt, app) {
       const st = c.state, M = c._m; if (st.burnt) return;
       const r = ledAvg(st, 'ar', M.Ir, dt), g = ledAvg(st, 'ag', M.Ig, dt), b = ledAvg(st, 'ab', M.Ib, dt);
-      if (Math.max(r, g, b) > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast('💥 RGB LED 电流过大被烧毁！每个颜色都需要限流电阻'); } } else st.over = 0;
+      if (Math.max(r, g, b) > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('rgbled.rgb_led_burnt_out_by_excessive_curre')); } } else st.over = 0;
     },
     mix(c) { const st = c.state; const k = [(st.ar || 0) / 0.02, (st.ag || 0) / 0.02 * 1.0, (st.ab || 0) / 0.02]; return { hex: mixHex(k[0], k[1], k[2]), b: Math.max(k[0], k[1], k[2]), k }; },
-    readings(c) { const M = c._m, x = DEFS.rgbled.mix(c); return [['I 红 R', U.fmt(M.Ir || 0, 'A')], ['I 绿 G', U.fmt(M.Ig || 0, 'A')], ['I 蓝 B', U.fmt(M.Ib || 0, 'A')], ['混合颜色', '<span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:' + x.hex + ';vertical-align:middle"></span> ' + x.hex], ['亮度', Math.round(U.clamp(x.b, 0, 9.99) * 100) + '%'], ['状态', c.state.burnt ? '已烧毁' : '正常']]; },
+    readings(c) { const M = c._m, x = DEFS.rgbled.mix(c); return [[_t('rgbled.i_red_r'), U.fmt(M.Ir || 0, 'A')], [_t('rgbled.i_green_g'), U.fmt(M.Ig || 0, 'A')], [_t('rgbled.i_blue_b'), U.fmt(M.Ib || 0, 'A')], [_t('rgbled.mixed_color'), '<span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:' + x.hex + ';vertical-align:middle"></span> ' + x.hex], [_t('rgbled.brightness'), Math.round(U.clamp(x.b, 0, 9.99) * 100) + '%'], [_t('common.state'), c.state.burnt ? _t('common.burnt_out') : _t('common.normal')]]; },
     draw(ctx, c) {
       for (const [x] of DEFS.rgbled.terms) D.poly(ctx, [[x, 20], [x, 2], [-10 + (x + 10) * 0.25, -6]]);
       const x = DEFS.rgbled.mix(c), b = c.state.burnt ? 0 : U.clamp(x.b, 0, 1.5);
@@ -500,11 +500,11 @@ Object.assign(DEFS, {
   bicolor: {
     name: '双色 LED (红/绿)', en: 'Bi-colour LED', cat: 'light', desig: 'LED', terms: [[-40, 0], [40, 0]], termNames: ['脚1 (正向=红)', '脚2 (正向=绿)'], box: [-40, -36, 40, 6],
     props: [{ k: 'Imax', label: '最大电流', unit: 'A', def: 0.03, min: 1e-4 }],
-    label: () => '红/绿',
+    label: () => _t('bicolor.red_green'),
     build(c, n, m) { if (c.state.burnt) { c._d = null; return; } c._d = [m.addD(n[0], n[1], ledIs(1.9), 2 * VT, sub(c.state, 'r')), m.addD(n[1], n[0], ledIs(2.1), 2 * VT, sub(c.state, 'g'))]; c._p = null; },
     measure(c, m) { c._m.V = m.v(c._nodes[0]) - m.v(c._nodes[1]); c._m.Ir = c._d ? c._d[0].i : 0; c._m.Ig = c._d ? c._d[1].i : 0; c._m.I = c._m.Ir - c._m.Ig; c._m.P = Math.abs(c._m.V * c._m.I); },
-    post(c, dt, app) { const st = c.state; if (st.burnt) return; const r = ledAvg(st, 'ar', c._m.Ir, dt), g = ledAvg(st, 'ag', c._m.Ig, dt); if (Math.max(r, g) > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast('💥 双色 LED 电流过大被烧毁'); } } else st.over = 0; },
-    readings(c) { const st = c.state; return [['红 (1→2)', U.fmt(c._m.Ir || 0, 'A')], ['绿 (2→1)', U.fmt(c._m.Ig || 0, 'A')], ['颜色', (st.ar || 0) > 1e-3 && (st.ag || 0) > 1e-3 ? '黄/橙 (交流混色)' : (st.ar || 0) > 1e-4 ? '红' : (st.ag || 0) > 1e-4 ? '绿' : '灭']]; },
+    post(c, dt, app) { const st = c.state; if (st.burnt) return; const r = ledAvg(st, 'ar', c._m.Ir, dt), g = ledAvg(st, 'ag', c._m.Ig, dt); if (Math.max(r, g) > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('bicolor.bi_color_led_burnt_out_by_excessive')); } } else st.over = 0; },
+    readings(c) { const st = c.state; return [[_t('bicolor.red_1_2'), U.fmt(c._m.Ir || 0, 'A')], [_t('bicolor.green_2_1'), U.fmt(c._m.Ig || 0, 'A')], [_t('bicolor.color'), (st.ar || 0) > 1e-3 && (st.ag || 0) > 1e-3 ? _t('bicolor.yellow_orange_ac_mixing') : (st.ar || 0) > 1e-4 ? _t('bicolor.red') : (st.ag || 0) > 1e-4 ? _t('bicolor.green') : _t('bicolor.off')]]; },
     draw(ctx, c) {
       D.poly(ctx, [[-40, 0], [-4, 0], [-4, -6]]); D.poly(ctx, [[40, 0], [4, 0], [4, -6]]);
       const st = c.state, r = (st.ar || 0) / 0.02, g = (st.ag || 0) / 0.02, b = c.state.burnt ? 0 : U.clamp(Math.max(r, g), 0, 1.5), hex = mixHex(r * 1.0, g * 0.85, 0);
@@ -530,7 +530,7 @@ Object.assign(DEFS, {
       const n = c._nodes; c._m.Ib = c._q1.ib + c._r1.i; c._m.I = c._q1.ic + c._q2.ic - c._dce.i;
       c._m.V = m.v(n[1]) - m.v(n[2]); c._m.Vbe = m.v(n[0]) - m.v(n[2]); c._m.P = Math.abs(c._m.V * c._m.I);
     },
-    readings(c) { const M = c._m; return [['集电极电流 Ic', U.fmt(M.I || 0, 'A')], ['基极电流 Ib', U.fmt(M.Ib || 0, 'A')], ['Ic/Ib', Math.abs(M.Ib) > 1e-9 ? (M.I / M.Ib).toFixed(0) : '—'], ['Vbe', U.fmt(M.Vbe || 0, 'V')], ['Vce', U.fmt(M.V || 0, 'V')], ['耗散', U.fmt(M.P || 0, 'W')]]; },
+    readings(c) { const M = c._m; return [[_t('common.collector_current_ic'), U.fmt(M.I || 0, 'A')], [_t('tip120.base_current_ib'), U.fmt(M.Ib || 0, 'A')], ['Ic/Ib', Math.abs(M.Ib) > 1e-9 ? (M.I / M.Ib).toFixed(0) : '—'], ['Vbe', U.fmt(M.Vbe || 0, 'V')], ['Vce', U.fmt(M.V || 0, 'V')], [_t('tip120.dissipation'), U.fmt(M.P || 0, 'W')]]; },
     draw(ctx, c) { drawTO220(ctx, c, 'TIP120', 'B C E', '#1f1f1f'); },
   },
   opto: {
@@ -547,7 +547,7 @@ Object.assign(DEFS, {
       const If = p.Is * (Math.exp(Math.min(vd / p.nVt, 700)) - 1), s = optoSat(vce, p.Vs)[0];
       c._m.If = If; c._m.Vf = vd; c._m.Vce = vce; c._m.Ic = p.ctr * Math.max(If, 0) * s + p.gl * vce; c._m.I = c._m.Ic; c._m.V = vce; c._m.P = vd * If + vce * c._m.Ic;
     },
-    readings(c) { const M = c._m; return [['LED 电流 If', U.fmt(M.If || 0, 'A')], ['LED 压降 Vf', U.fmt(M.Vf || 0, 'V')], ['集电极电流 Ic', U.fmt(M.Ic || 0, 'A')], ['Vce', U.fmt(M.Vce || 0, 'V')], ['实际 Ic/If', (M.If || 0) > 1e-6 ? (M.Ic / M.If * 100).toFixed(0) + ' %' : '—'], ['状态', (M.If || 0) < 1e-5 ? '截止 (LED 未点亮)' : (M.Vce || 0) < 0.4 ? '饱和导通' : '线性区']]; },
+    readings(c) { const M = c._m; return [[_t('opto.led_current_if'), U.fmt(M.If || 0, 'A')], [_t('opto.led_forward_voltage_vf'), U.fmt(M.Vf || 0, 'V')], [_t('common.collector_current_ic'), U.fmt(M.Ic || 0, 'A')], ['Vce', U.fmt(M.Vce || 0, 'V')], [_t('opto.actual_ic_if'), (M.If || 0) > 1e-6 ? (M.Ic / M.If * 100).toFixed(0) + ' %' : '—'], [_t('common.state'), (M.If || 0) < 1e-5 ? _t('opto.off_led_not_lit') : (M.Vce || 0) < 0.4 ? _t('common.saturated_on') : _t('opto.linear_region')]]; },
     draw(ctx, c) {
       drawDIP(ctx, c, [], 56, 44, '', '#f4f4f0');
       for (const [x, y] of DEFS.opto.terms) D.lead(ctx, x, y, Math.sign(x) * 28, y);
@@ -566,7 +566,7 @@ Object.assign(DEFS, {
       const n = c._nodes, p = c._q, va = m.v(n[1]) - m.v(n[0]), vg = m.v(n[2]) - m.v(n[0]);
       c._m.V = va; c._m.Vg = vg; c._m.Ig = thyrJ(p, vg, p.IsG, VT)[0]; c._m.I = c.state.on ? thyrJ(p, va, p.IsM, p.nVtM)[0] : 1e-9 * va; c._m.P = Math.abs(va * c._m.I);
     },
-    readings(c) { const M = c._m; return [['状态', c.state.on ? '导通 (已锁存 Latched)' : '关断 Off'], ['阳极电流 Ia', U.fmt(M.I || 0, 'A')], ['A−K 压降', U.fmt(M.V || 0, 'V')], ['门极电流 Ig', U.fmt(M.Ig || 0, 'A')], ['触发/维持', U.fmt(c.props.Igt, 'A') + ' / ' + U.fmt(c.props.Ih, 'A')]]; },
+    readings(c) { const M = c._m; return [[_t('common.state'), c.state.on ? _t('scr.on_latched') : _t('scr.off')], [_t('scr.anode_current_ia'), U.fmt(M.I || 0, 'A')], [_t('scr.a_k_voltage_drop'), U.fmt(M.V || 0, 'V')], [_t('scr.gate_current_ig'), U.fmt(M.Ig || 0, 'A')], [_t('scr.trigger_hold'), U.fmt(c.props.Igt, 'A') + ' / ' + U.fmt(c.props.Ih, 'A')]]; },
     draw(ctx, c) { drawTO220(ctx, c, c.type === 'triac' ? 'BT136' : 'BT151', c.type === 'triac' ? 'T1 T2 G' : 'K A G', c.state.on ? '#2a3a1f' : '#1f1f1f'); if (c.state.on) { ctx.fillStyle = '#39d353'; ctx.beginPath(); ctx.arc(12, -8, 2.5, 0, 7); ctx.fill(); } },
   },
 });
@@ -590,11 +590,11 @@ Object.assign(DEFS, {
   tactile: {
     name: '轻触按键 (4 脚)', en: 'Tactile Button 6×6', cat: 'control', desig: 'SW', momentary: true, innerShort: true,
     terms: [[-20, -20], [20, -20], [-20, 20], [20, 20]], termNames: ['1 (与 2 内部相连)', '2', '3 (与 4 内部相连)', '4'], box: [-24, -24, 24, 24],
-    props: [], label: (c) => (c.state.pressed ? '按下' : '松开'),
+    props: [], label: (c) => (c.state.pressed ? _t('tactile.pressed') : _t('tactile.released')),
     shorted: (c) => (c.state.pressed ? [[0, 1], [2, 3], [0, 2]] : [[0, 1], [2, 3]]),
     build(c, n, m) { if (!c.state.pressed) m.addR(n[0], n[2], G_OFF); c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['状态', c.state.pressed ? '按下 — 1/2 与 3/4 接通' : '松开 — 1/2 与 3/4 断开'], ['说明', '按住鼠标 = 按下；1-2、3-4 两两常通']]; },
+    readings(c) { return [[_t('common.state'), c.state.pressed ? _t('tactile.pressed_1_2_and_3_4_connected') : _t('tactile.released_1_2_and_3_4_open')], [_t('common.note'), _t('tactile.hold_the_mouse_button_press_1_2_and')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.tactile.terms) D.lead(ctx, x, y, x * 0.6, y * 0.6);
       ctx.fillStyle = D.vgrad(ctx, -14, 14, [[0, '#d7dbe0'], [1, '#8a9099']]); D.rrect(ctx, -15, -15, 30, 30, 2); ctx.fill();
@@ -611,7 +611,7 @@ Object.assign(DEFS, {
     shorted: (c) => [[1, c.props.right ? 2 : 0]],
     build(c, n, m) { m.addR(n[1], c.props.right ? n[0] : n[2], G_OFF); c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['位置', c.props.right ? 'B — COM 与 B 接通' : 'A — COM 与 A 接通']]; },
+    readings(c) { return [[_t('common.position'), c.props.right ? _t('spdt.b_com_connected_to_b') : _t('spdt.a_com_connected_to_a')]]; },
     draw(ctx, c) {
       for (const [x] of DEFS.spdt.terms) D.lead(ctx, x, 20, x, 6);
       ctx.fillStyle = D.vgrad(ctx, -12, 8, [[0, '#e6e9ed'], [1, '#8c939c']]); D.rrect(ctx, -28, -10, 56, 18, 2); ctx.fill();
@@ -628,7 +628,7 @@ Object.assign(DEFS, {
     shorted: (c) => (c.props.up ? [[1, 2], [4, 5]] : [[1, 0], [4, 3]]),
     build(c, n, m) { if (c.props.up) { m.addR(n[1], n[0], G_OFF); m.addR(n[4], n[3], G_OFF); } else { m.addR(n[1], n[2], G_OFF); m.addR(n[4], n[5], G_OFF); } c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['位置', c.props.up ? 'B：1COM–1B、2COM–2B 接通' : 'A：1COM–1A、2COM–2A 接通']]; },
+    readings(c) { return [[_t('common.position'), c.props.up ? _t('dpdt.b_1com_1b_2com_2b_connected') : _t('dpdt.a_1com_1a_2com_2a_connected')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.dpdt.terms) D.lead(ctx, x, y, x * 0.75, y * 0.5);
       ctx.fillStyle = D.vgrad(ctx, -16, 16, [[0, '#3a3f46'], [1, '#15181c']]); D.rrect(ctx, -34, -14, 68, 28, 3); ctx.fill();
@@ -640,13 +640,13 @@ Object.assign(DEFS, {
   rotary: {
     name: '旋转波段开关 (1刀4掷)', en: 'Rotary Switch 1P4T', cat: 'control', desig: 'SW', innerShort: true,
     terms: [[-60, 0], [60, -40], [60, -20], [60, 20], [60, 40]], termNames: ['COM', '1', '2', '3', '4'], box: [-60, -44, 60, 44],
-    props: [{ k: 'sel', label: '档位', kind: 'select', num: true, opts: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], def: 1 }], label: (c) => '档 ' + c.props.sel,
+    props: [{ k: 'sel', label: '档位', kind: 'select', num: true, opts: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], def: 1 }], label: (c) => _t('rotary.pos') + c.props.sel,
     click(c, app) { c.props.sel = (+c.props.sel % 4) + 1; app.dirty = true; app.changed(); },
     onWheel(c, dir) { c.props.sel = U.clamp((+c.props.sel || 1) + dir, 1, 4); },
     shorted: (c) => [[0, U.clamp(+c.props.sel || 1, 1, 4)]],
     build(c, n, m) { const s = U.clamp(+c.props.sel || 1, 1, 4); for (let k = 1; k <= 4; k++) if (k !== s) m.addR(n[0], n[k], G_OFF); c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['档位', 'COM → ' + c.props.sel], ['操作', '单击 = 下一档；滚轮 = 切换']]; },
+    readings(c) { return [[_t('common.range'), 'COM → ' + c.props.sel], [_t('common.operation'), _t('rotary.click_next_position_wheel_select')]]; },
     draw(ctx, c) {
       D.lead(ctx, -60, 0, -34, 0); for (const [x, y] of DEFS.rotary.terms.slice(1)) D.poly(ctx, [[x, y], [44, y], [30, y * 0.55]]);
       ctx.fillStyle = D.vgrad(ctx, -34, 34, [[0, '#d8dce1'], [1, '#7c838c']]); ctx.beginPath(); ctx.arc(0, 0, 34, 0, 7); ctx.fill();
@@ -666,7 +666,7 @@ Object.assign(DEFS, {
     shorted: (c) => { const r = []; for (let i = 0; i < 4; i++) if (c.props['s' + (i + 1)]) r.push([i, i + 4]); return r.length ? r : null; },
     build(c, n, m) { for (let i = 0; i < 4; i++) if (!c.props['s' + (i + 1)]) m.addR(n[i], n[i + 4], G_OFF); c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { return [['状态 1-4', [1, 2, 3, 4].map(i => (c.props['s' + i] ? 'ON' : 'off')).join(' ')], ['操作', '单击对应拨杆切换']]; },
+    readings(c) { return [[_t('dip4.state_1_4'), [1, 2, 3, 4].map(i => (c.props['s' + i] ? 'ON' : 'off')).join(' ')], [_t('common.operation'), _t('dip4.click_a_lever_to_toggle_it')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.dip4.terms) D.lead(ctx, x, y, x, y * 0.55);
       ctx.fillStyle = D.vgrad(ctx, -22, 22, [[0, '#2f6fd6'], [1, '#173f8c']]); D.rrect(ctx, -50, -22, 80, 44, 3); ctx.fill();
@@ -687,7 +687,7 @@ Object.assign(DEFS, {
     props: [{ k: 'ca', label: '共阳极 (CA)', kind: 'bool', def: false }, { k: 'color', label: '颜色', kind: 'select', opts: [['red', '红 Red'], ['green', '绿 Green'], ['blue', '蓝 Blue'], ['yellow', '黄 Yellow']], def: 'red' },
       { k: 'Imax', label: '每段最大电流', unit: 'A', def: 0.03, min: 1e-4 }],
     SEGPIN: { a: 3, b: 4, c: 8, d: 6, e: 5, f: 1, g: 0, dp: 9 },
-    label: (c) => (c.props.ca ? '共阳 CA' : '共阴 CC'),
+    label: (c) => (c.props.ca ? _t('seg7cc.ca') : _t('seg7cc.cc')),
     shorted: () => [[2, 7]],
     vf(c) { return { red: 1.9, green: 2.1, blue: 3.0, yellow: 2.0 }[c.props.color] || 1.9; },
     build(c, n, m) {
@@ -700,11 +700,11 @@ Object.assign(DEFS, {
     post(c, dt, app) {
       const st = c.state; if (st.burnt) return; let mx = 0;
       for (const k of SEG_ORDER) mx = Math.max(mx, ledAvg(st, 'b' + k, c._m['I' + k], dt));
-      if (mx > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast('💥 数码管段电流过大被烧毁！每段需串限流电阻'); } } else st.over = 0;
+      if (mx > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('seg7cc.display_segment_burnt_out_by_excessi')); } } else st.over = 0;
     },
     lit(c) { const st = c.state; let b = 0; SEG_ORDER.forEach((k, i) => { if ((st['b' + k] || 0) > 1e-3) b |= 1 << i; }); return b; },
-    digit(c) { const v = DEFS.seg7cc.lit(c) & 0x7f, SEG = [0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f, 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71]; const i = SEG.indexOf(v); return v === 0 ? '空白' : i >= 0 ? i.toString(16).toUpperCase() : '?'; },
-    readings(c) { const M = c._m; return [['显示', DEFS.seg7cc.digit(c) + ((DEFS.seg7cc.lit(c) & 0x80) ? ' .' : '')], ['亮段', SEG_ORDER.filter((k, i) => (DEFS.seg7cc.lit(c) >> i) & 1).join(' ') || '—'], ['总电流', U.fmt(Math.abs(M.I || 0), 'A')], ['状态', c.state.burnt ? '已烧毁' : '正常']]; },
+    digit(c) { const v = DEFS.seg7cc.lit(c) & 0x7f, SEG = [0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f, 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71]; const i = SEG.indexOf(v); return v === 0 ? _t('seg7cc.blank') : i >= 0 ? i.toString(16).toUpperCase() : '?'; },
+    readings(c) { const M = c._m; return [[_t('common.display'), DEFS.seg7cc.digit(c) + ((DEFS.seg7cc.lit(c) & 0x80) ? ' .' : '')], [_t('seg7cc.lit_segments'), SEG_ORDER.filter((k, i) => (DEFS.seg7cc.lit(c) >> i) & 1).join(' ') || '—'], [_t('common.total_current'), U.fmt(Math.abs(M.I || 0), 'A')], [_t('common.state'), c.state.burnt ? _t('common.burnt_out') : _t('common.normal')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.seg7cc.terms) D.lead(ctx, x, y, x, y * 0.8);
       ctx.fillStyle = '#1a1c20'; D.rrect(ctx, -44, -48, 88, 96, 4); ctx.fill(); ctx.fillStyle = '#26292e'; D.rrect(ctx, -38, -42, 76, 84, 3); ctx.fill();
@@ -739,10 +739,10 @@ Object.assign(DEFS, {
     post(c, dt, app) {
       const st = c.state; if (st.burnt) return; let mx = 0;
       (c._m.Is || []).forEach((I, i) => { mx = Math.max(mx, ledAvg(st, 'b' + i, I, dt)); });
-      if (mx > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast('💥 LED 光柱电流过大被烧毁'); } } else st.over = 0;
+      if (mx > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('ledbar.led_bar_graph_burnt_out_by_excessive')); } } else st.over = 0;
     },
     count(c) { let k = 0; for (let i = 0; i < 10; i++) if ((c.state['b' + i] || 0) > 1e-3) k++; return k; },
-    readings(c) { return [['点亮段数', DEFS.ledbar.count(c) + ' / 10'], ['总电流', U.fmt(Math.abs(c._m.I || 0), 'A')], ['状态', c.state.burnt ? '已烧毁' : '正常']]; },
+    readings(c) { return [[_t('ledbar.lit_segments'), DEFS.ledbar.count(c) + ' / 10'], [_t('common.total_current'), U.fmt(Math.abs(c._m.I || 0), 'A')], [_t('common.state'), c.state.burnt ? _t('common.burnt_out') : _t('common.normal')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.ledbar.terms) D.lead(ctx, x, y, x, y * 0.55);
       ctx.fillStyle = '#1a1c20'; D.rrect(ctx, -110, -22, 200, 44, 3); ctx.fill();
@@ -774,7 +774,7 @@ Object.assign(DEFS, {
       const want = st.moving ? 0.15 * Math.min(1, Math.abs(e) / 10) : Math.abs(e) > 0.05 && powered ? 0.02 : 0;
       st.im = (st.im || 0) + (want * U.clamp(M.Vcc / 5, 0, 1.2) - (st.im || 0)) * Math.min(1, dt / 0.005);
     },
-    readings(c) { const st = c.state; return [['角度', (st.ang === undefined ? 90 : st.ang).toFixed(1) + '°'], ['目标角度', st.tgt === undefined ? '—' : st.tgt.toFixed(1) + '°'], ['脉宽', st.pw === undefined ? '— (无信号)' : U.fmt(st.pw, 's')], ['信号周期', st.T ? U.fmt(st.T, 's') + ' (' + U.fmt(1 / st.T, 'Hz') + ')' : '—'], ['电源', U.fmt(c._m.Vcc || 0, 'V') + (c._m.Vcc > 4 ? '' : ' (欠压, 不动作)')], ['电流', U.fmt(c._m.I || 0, 'A')]]; },
+    readings(c) { const st = c.state; return [[_t('servo.angle'), (st.ang === undefined ? 90 : st.ang).toFixed(1) + '°'], [_t('servo.target_angle'), st.tgt === undefined ? '—' : st.tgt.toFixed(1) + '°'], [_t('servo.pulse_width'), st.pw === undefined ? _t('servo.no_signal') : U.fmt(st.pw, 's')], [_t('servo.signal_period'), st.T ? U.fmt(st.T, 's') + ' (' + U.fmt(1 / st.T, 'Hz') + ')' : '—'], [_t('common.supply'), U.fmt(c._m.Vcc || 0, 'V') + (c._m.Vcc > 4 ? '' : _t('servo.undervoltage_idle'))], [_t('common.current'), U.fmt(c._m.I || 0, 'A')]]; },
     draw(ctx, c) {
       const cols = ['#6b3a1a', '#d62828', '#f28c28'];
       DEFS.servo.terms.forEach(([x, y], i) => { ctx.strokeStyle = cols[i]; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(-58, y * 0.3); ctx.stroke(); });
@@ -801,7 +801,7 @@ Object.assign(DEFS, {
       st.rpm = (st.rpm || 0) + (target - (st.rpm || 0)) * Math.min(1, dt / 0.8);
       st.ang = ((st.ang || 0) + st.rpm / 60 * 2 * Math.PI * dt) % (2 * Math.PI);
     },
-    readings(c) { return [['转速', Math.round(c.state.rpm || 0) + ' rpm'], ['电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(c._m.I || 0, 'A')], ['说明', '内置防反接；约 30% 额定电压才能启动']]; },
+    readings(c) { return [[_t('common.speed'), Math.round(c.state.rpm || 0) + ' rpm'], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(c._m.I || 0, 'A')], [_t('common.note'), _t('fan.built_in_reverse_polarity_protection')]]; },
     draw(ctx, c) {
       D.poly(ctx, [[-40, 40], [-40, 32], [-30, 30]]); D.poly(ctx, [[40, 40], [40, 32], [30, 30]]);
       ctx.fillStyle = D.vgrad(ctx, -36, 36, [[0, '#3a3a3a'], [1, '#141414']]); D.rrect(ctx, -36, -36, 72, 72, 6); ctx.fill();
@@ -817,10 +817,10 @@ Object.assign(DEFS, {
   vibmotor: {
     name: '振动马达 (扁平)', en: 'Vibration Motor', cat: 'light', desig: 'M', terms: [[-40, 0], [40, 0]], termNames: ['+ 红', '− 蓝'], box: [-40, -22, 40, 22],
     props: [{ k: 'Vr', label: '额定电压', unit: 'V', def: 3, min: 0.5 }, { k: 'Ir', label: '额定电流', unit: 'A', def: 0.08, min: 1e-3 }],
-    label: (c) => ((c.state.vib || 0) > 0.05 ? '振动中' : '静止'),
+    label: (c) => ((c.state.vib || 0) > 0.05 ? _t('vibmotor.vibrating') : _t('vibmotor.stopped')),
     build(c, n, m) { c._p = m.addR(n[0], n[1], c.props.Ir / c.props.Vr); },
     post(c, dt) { const V = Math.abs(c._m.V), tg = V > 0.35 * c.props.Vr ? U.clamp(V / c.props.Vr, 0, 1.5) : 0; c.state.vib = (c.state.vib || 0) + (tg - (c.state.vib || 0)) * Math.min(1, dt / 0.1); },
-    readings(c) { const v = c.state.vib || 0; return [['振动强度', Math.round(v * 100) + ' %'], ['转速 (约)', Math.round(v * 12000) + ' rpm'], ['电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(c._m.I || 0, 'A')]]; },
+    readings(c) { const v = c.state.vib || 0; return [[_t('vibmotor.vibration_strength'), Math.round(v * 100) + ' %'], [_t('vibmotor.speed_approx'), Math.round(v * 12000) + ' rpm'], [_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(c._m.I || 0, 'A')]]; },
     draw(ctx, c) {
       const v = c.state.vib || 0, j = v > 0.05 ? v * 2 : 0, t = performance.now() / 20, dx = j * Math.sin(t * 3.1), dy = j * Math.cos(t * 2.3);
       ctx.strokeStyle = '#d62828'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-40, 0); ctx.quadraticCurveTo(-26, -2, -14 + dx, 6 + dy); ctx.stroke();

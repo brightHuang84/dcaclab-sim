@@ -9,7 +9,7 @@ const near = (v, x, tol) => Math.abs(v - x) <= tol;
 const USER = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'user-7805-supply.json'), 'utf8'));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -298,7 +298,7 @@ const USER = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'user-7
   check('ex_mov_surge_without_mov_burns_bulb', exr.nomov.pk > 850 && exr.nomov.bulbBurnt, exr.nomov);
   check('ex_tl431_5V_reference', exr.tl431.bad === 0 && near(exr.tl431.V, 4.99, 0.03), exr.tl431);
   check('ex_nightlight_led_on_in_dark_only', exr.night.bad === 0 && exr.night.dark > 0.005 && exr.night.bright < 1e-5, exr.night);
-  check('ex_l298n_forward_reverse_brake', exr.l298n.bad === 0 && exr.l298n.fwd > 8 && exr.l298n.rev < -8 && Math.abs(exr.l298n.brake) < 3 && /Brake/.test(exr.l298n.st), exr.l298n);
+  check('ex_l298n_forward_reverse_brake', exr.l298n.bad === 0 && exr.l298n.fwd > 8 && exr.l298n.rev < -8 && Math.abs(exr.l298n.brake) < 3 && /Brake|制动/.test(exr.l298n.st), exr.l298n);
   check('ex_relay_module_low_trigger_lamp', exr.relay.bad === 0 && exr.relay.on > 0.35 && exr.relay.off < 1e-3 && !exr.relay.st, exr.relay);
   check('ex_hall_and_reed_leds', exr.hall.bad === 0 && exr.hall.a[0] > 0.005 && exr.hall.a[1] < 1e-6 && exr.hall.b[0] < 1e-6 && exr.hall.b[1] > 0.005, exr.hall);
   check('ex_lcd1602_hello', exr.lcd.bad === 0 && exr.lcd.init && exr.lcd.ct > 0.5 && exr.lcd.ct < 1 && exr.lcd.bl > 0.01 && exr.lcd.l1 === 'Hello, DCACLab!', exr.lcd);

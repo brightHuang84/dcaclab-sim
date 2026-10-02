@@ -1,7 +1,7 @@
 const { chromium } = require('playwright-core');
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 }, acceptDownloads: true });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN', acceptDownloads: true });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));

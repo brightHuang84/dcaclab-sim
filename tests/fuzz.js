@@ -9,7 +9,7 @@ const fs = require('fs'), path = require('path');
 const COUNT = +(process.argv[2] || 300), SEED = +(process.argv[3] || 1);
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1400, height: 860 }, locale: 'zh-CN' });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto((process.env.URL || 'http://127.0.0.1:8765/index.html') + '?fresh=1');
   await page.waitForTimeout(400);

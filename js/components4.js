@@ -129,24 +129,24 @@ Object.assign(DEFS, {
       if (st.ol) { if (M.x < 0.9) st.ol = false; } else if (M.x > 1.2 && M.en > 0.5) st.ol = true;
       // thermal model: ~3 s of sustained overload trips thermal shutdown; restarts when cooled
       st.heat = Math.max(0, (st.heat || 0) + dt * (st.ol ? 1 : -0.5));
-      if (!st.hot && st.heat > 3) { st.hot = true; app.toast('🔥 升压模块过热！持续过流，已热关断 (Boost module thermal shutdown)'); }
+      if (!st.hot && st.heat > 3) { st.hot = true; app.toast(_t('boost.boost_module_overheated_sustained_ov')); }
       else if (st.hot && st.heat < 1) st.hot = false;
     },
     status(c) {
       const M = c._m, st = c.state;
-      if (st.hot) return '过热保护 Thermal shutdown';
-      if (!(M.en > 0.5)) return st.brown ? '输入功率不足 Brown-out (电源太弱，打嗝重启)' : '输入过低 UVLO (Vin < ' + U.fmtShort(c.props.Vmin, 'V') + ')';
-      if (st.ol || M.x > 1.05) return '过流 限流/折返 Over-current';
-      if (M.pass) return '直通 Pass-through (Vin > Vout)';
-      return '正常 Regulating';
+      if (st.hot) return _t('common.thermal_shutdown');
+      if (!(M.en > 0.5)) return st.brown ? _t('boost.brown_out_supply_too_weak_hiccup_res') : _t('common.input_too_low_uvlo_vin') + U.fmtShort(c.props.Vmin, 'V') + ')';
+      if (st.ol || M.x > 1.05) return _t('common.over_current_limit_foldback');
+      if (M.pass) return _t('boost.pass_through_vin_vout');
+      return _t('common.regulating');
     },
     readings(c) {
       const M = c._m, z = (v, e) => (Math.abs(v) < e ? 0 : v);
       const eta = M.Pin > 1e-6 ? (M.Pout / M.Pin * 100).toFixed(1) + ' %' : '—';
-      return [['输入电压 Vin', U.fmt(z(M.Vin || 0, 1e-6), 'V')], ['输入电流 Iin', U.fmt(z(M.Iin || 0, 1e-7), 'A')],
-        ['输出电压 Vout', U.fmt(z(M.Vout || 0, 1e-6), 'V')], ['输出电流 Iout', U.fmt(z(M.Iout || 0, 1e-7), 'A')],
-        ['输入功率 Pin', U.fmt(z(M.Pin || 0, 1e-7), 'W')], ['输出功率 Pout', U.fmt(z(M.Pout || 0, 1e-7), 'W')],
-        ['效率 η', eta], ['设定 Vset', U.fmt(DEFS.boost.vset(c), 'V')], ['状态', DEFS.boost.status(c)]];
+      return [[_t('common.input_voltage_vin'), U.fmt(z(M.Vin || 0, 1e-6), 'V')], [_t('common.input_current_iin'), U.fmt(z(M.Iin || 0, 1e-7), 'A')],
+        [_t('common.output_voltage_vout'), U.fmt(z(M.Vout || 0, 1e-6), 'V')], [_t('common.output_current_iout'), U.fmt(z(M.Iout || 0, 1e-7), 'A')],
+        [_t('boost.input_power_pin'), U.fmt(z(M.Pin || 0, 1e-7), 'W')], [_t('boost.output_power_pout'), U.fmt(z(M.Pout || 0, 1e-7), 'W')],
+        [_t('boost.efficiency'), eta], [_t('common.setpoint_vset'), U.fmt(DEFS.boost.vset(c), 'V')], [_t('common.state'), DEFS.boost.status(c)]];
     },
     draw(ctx, c, env) {
       const st = c.state, M = c._m || {};
@@ -195,7 +195,7 @@ Object.assign(DEFS, {
           ctx.fillText('VIN+', -66, -30 + 2); ctx.fillText('VIN−', -66, 30);
           ctx.textAlign = 'right'; ctx.fillText('VOUT+', 66, -38); ctx.fillText('VOUT−', 66, 30);
           ctx.textAlign = 'center'; ctx.fillText('ADJ', 8, -12 + 1);
-          if (st.hot) { ctx.fillStyle = '#ffdd33'; ctx.font = 'bold 8px sans-serif'; ctx.fillText('🔥 过热', -40, 16); }
+          if (st.hot) { ctx.fillStyle = '#ffdd33'; ctx.font = 'bold 8px sans-serif'; ctx.fillText(_t('common.hot'), -40, 16); }
         } else {
           ctx.fillText('BOOST', 0, 0);
           if (st.hot) { ctx.fillStyle = '#ffdd33'; ctx.fillText('🔥', 0, 12); }

@@ -1,6 +1,10 @@
-# 电路实验室 · Circuit Lab (DCACLab-style simulator) — v7
+# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v7
 
-This is a self-contained circuit simulator that runs in the browser, inspired by DCACLab. It is written in plain HTML, CSS and JavaScript (classic `<script>` tags). There is no build step, no CDN and no network access. The whole UI is in Chinese and English.
+**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 42 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar.
+
+> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。
+
+This is a self-contained circuit simulator that runs in the browser, inspired by DCACLab. It is written in plain HTML, CSS and JavaScript (classic `<script>` tags). There is no build step, no CDN and no network access. The whole UI is localised (see Languages below).
 
 ## Run
 - **Double-click `index.html`.** It works from `file://` in Chrome, Edge and Firefox. Or:
@@ -9,6 +13,25 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
   - `?example=<id>&run=1` loads an example and starts it.
   - `?fresh=1` skips the autosave.
 - Example ids: `ohm, series, parallel, rc, led, fuse, dimmer, acdiode, rlc, scope, scopesq, npn, zener, ne555, breadboard, opinv, opnoninv, comparator, halfadder, clockblink, counter, lissajous, fft, relay, motor, xfmr, sensors, boost, reg7805, lm317, rgbmix, opto, scr, buckaa`; **v7:** `movsurge, tl431, nightlight, l298n, relaymod, hallreed, lcd1602, buzzers`.
+
+## Languages / 多语言 (i18n)
+- **Locales:** `zh-CN` (source), `zh-TW`, `en`, `ja`, `ko`, `es`, `fr`, `de`, `ru`, `pt-BR`. Every user-facing string is translated: the toolbar, palette categories and part names, properties (labels, units, options), live readings, status bar, toasts and warnings (including convergence messages), help tips, advanced settings, the analysis table, multimeter modes, and example names and descriptions. Part numbers (7805, LM317, NE555, …) and SI units are kept as is. English subtitles appear only in the Chinese locales.
+- **Choosing a language:**
+  - `?lang=xx` in the URL (e.g. `?lang=ja`) is used for that page load only and is not saved.
+  - Otherwise, the choice made in the 🌐 dropdown is used. It is saved in `localStorage` (`dcaclab-lang`).
+  - Otherwise, the first supported entry of `navigator.languages` is used (`zh-HK`/`zh-Hant` → `zh-TW`, `pt-*` → `pt-BR`, …).
+  - Otherwise, the UI falls back to English.
+- **What changes:** `<html lang>`, the document title and the meta description follow the language. Switching re-renders the UI at once and keeps the circuit and a running simulation.
+- **Saved circuits are language-neutral.** The saved and exported JSON holds type ids and numeric/enum values only, so a circuit saved in one language opens unchanged in any other.
+- **How it works:** translations are plain JS files, so `file://` still works and there is no fetch or build step.
+  - `js/i18n.js` provides `I18N` and the alias `_t(key, params)`. Placeholders look like `{name}`. The fallback chain is: chosen locale → `en` → `zh-CN` → the key itself.
+  - `js/locales/<code>.js` holds the strings for each locale, registered with `I18N.add(code, {...})`.
+  - Static HTML uses `data-i18n` and `data-i18n-title` attributes.
+- **Adding a language:**
+  1. Copy `js/locales/en.js` to `js/locales/<code>.js` and translate the values. Keep the keys, any HTML tags and the `{placeholders}`.
+  2. Add `<code>` with its native name to `I18N.LANGS` in `js/i18n.js`.
+  3. Add a `<script src="js/locales/<code>.js">` tag to `index.html`.
+  4. Run `tests/test9.js`. It reports missing or extra keys.
 
 ## Components
 | Category | Parts |
@@ -199,7 +222,15 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
 **v3:** op-amp inverting ×(−10) · op-amp non-inverting ×10 · op-amp comparator night-light (LDR vs potentiometer, 0…9 V rails, LED) · logic half adder (XOR + AND, two switches, two probes) · 2 Hz clock blinker + NOT gate · 4-bit D-flip-flop ripple counter → 7-segment display · scope X-Y Lissajous 1:2 · scope FFT of a square wave and its RC-filtered version · relay switching two bulbs (NO / NC, flyback diode) · DC motor with rheostat and ammeter · transformer 2:1 + bridge rectifier + 470 µF filter (≈ 6.9 V DC) · NTC and LDR divider sensors with voltmeters.
 
 ## Tests
-`tests/` contains the Playwright scripts used during development. They need `npm i playwright-core`, a Chrome at `/usr/bin/google-chrome`, and the folder served on port 8765.
+`tests/` contains the Playwright scripts used during development. They need `npm i playwright-core`, a Chrome at `/usr/bin/google-chrome`, and the folder served on port 8765. The older suites run the page with `locale: 'zh-CN'`.
+- `test9.js` runs the **i18n checks** (87). It covers:
+  - every locale has exactly the zh-CN key set, with no empty values and the same placeholders and tags; the fallback chain works;
+  - for each locale: `?lang`, `<html lang>`, the title, the meta description and the dropdown;
+  - a DOM scan of the toolbar, the examples menu, the palette, the status bar, the properties panel of every part type, wire properties, the HUD, the analysis table, toasts and readings. The scan checks for raw keys, for Chinese characters in non-Chinese locales, and for Simplified-only characters in `ja` and `zh-TW`;
+  - one example runs per locale, and all 42 examples run in every non-Chinese locale without Chinese text appearing;
+  - auto-detection from `navigator.languages`, persistence, `?lang` precedence, and rejection of an invalid `?lang`;
+  - live switching keeps the circuit and the running simulation; saved JSON is language-independent; `file://` works.
+- `shots8.js` makes screenshots 44–47 (en, ja, es, and the language menu).
 - `test8.js` runs **62 v7 checks** (also with `SPARSE=1`). It covers:
   - the user's 7805 supply: 0 failed steps, 5 V, LED 20 mA, fuse intact, sane ripple; v6 settings reproduce the failure; the KCL check alone fixes it, and so does RELTOL alone;
   - a starved Newton solve recovers automatically; the warning toast, HUD and highlight; the advanced panel (edit, range rejection, reset, persistence);
@@ -246,7 +277,7 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
 - Rotated ammeters and voltmeters show a narrow LCD, so readings are easier to read unrotated.
 - The boost module is an averaged model: no switching ripple, inductor current or start-up soft-start waveform. Efficiency is a constant, not a function of load. Reverse current into VOUT is blocked except for a 2 % leak.
 - v6 parts: the servo reads the pulse width from sampled edges, so an ideal step source (e.g. the clock) is quantised to Δt = 0.2 ms (≈ 36° per step; a 1.5 ms pulse from the clock is really 1.6 ms in the simulation). Regulators and the buck module are behavioural (no ripple, PSRR, load-transient or start-up waveforms); the buck efficiency is constant. The PSU and batteries have no sense of overload damage. The electrolytic capacitor has no ESR, and a popped one stays open until you press 🔧 更换新的. The optocoupler and thyristors have no switching delays or dV/dt triggering. The fan is a resistor + diode with a lagged speed, not an electromechanical model. (v7 adds the crystal oscillator, keypad, 16×2 LCD and reed switch.)
-- v7 convergence: one pathological random graph in the fuzz set still fails 1 step, and the run continues with the approximate solution. Time-step cutting is used only to recover a failed step; there is still no general adaptive time step driven by local truncation error.
+- v7 convergence: the current fuzz run (343 circuits, 73 000 steps) has 0 non-converged steps. Earlier runs had one pathological random graph that failed 1 step; if a step does fail, the run continues with the approximate solution. Time-step cutting is used only to recover a failed step; there is still no general adaptive time step driven by local truncation error.
 - v7 parts:
   - **Crystal oscillator:** above the Nyquist rate (f > 1/(2Δt) = 2.5 kHz at the default Δt) it outputs the box-filtered average (≈ VCC/2) instead of individual edges. It is an active (canned) oscillator; a passive crystal resonator is not modelled.
   - **LCD1602:** the text comes from the line1/line2 properties (as if a microcontroller had already initialised it); the HD44780 bus (RS / E / D0–D7) is not emulated.

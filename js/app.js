@@ -228,14 +228,14 @@ const app = {
     }
     const r = this._joinAt(cand, true);
     n += r.n;
-    if (n) { this.dirty = true; this.toast('已自动连接 ' + n + ' 处：导线经过的端子已接通 (auto-joined)'); }
-    if (r.skipped.length) this.toast((n ? '已自动连接 ' + n + ' 处；' : '') + '有导线跨过同一元件的其他引脚，未自动连接（橙色虚线标记，按 J 可强制连接）');
+    if (n) { this.dirty = true; this.toast(_t('app.auto_connected') + n + _t('app.spot_s_terminals_under_the_wire_are')); }
+    if (r.skipped.length) this.toast((n ? _t('app.auto_connected') + n + _t('app.spot_s') : '') + _t('app.a_wire_crosses_other_pins_of_the_sam'));
     return n;
   },
   // J key: connect every remaining pass-over
   joinPassOvers() {
     const r = this._joinAt(this.findPassOvers(), false);
-    if (r.n) { this.dirty = true; this.changed(); this.toast('已连接 ' + r.n + ' 处经过端子的导线'); } else this.toast('没有需要连接的导线交叠点');
+    if (r.n) { this.dirty = true; this.changed(); this.toast(_t('app.connected') + r.n + _t('app.wire_s_passing_over_terminals')); } else this.toast(_t('app.no_wire_overlaps_to_connect'));
     return r.n;
   },
   designators() {
@@ -297,7 +297,7 @@ const app = {
   },
   load(data, keepHistory) {
     if (typeof data === 'string') data = JSON.parse(data);
-    if (!data || !Array.isArray(data.comps)) throw new Error('无效的电路文件');
+    if (!data || !Array.isArray(data.comps)) throw new Error(_t('app.invalid_circuit_file'));
     const comps = data.comps.filter(c => DEFS[c.type]).map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y, rot: c.rot || 0, props: Object.assign(defaultProps(c.type), JSON.parse(JSON.stringify(c.props || {}))), state: {}, _m: {} }));
     this.comps = comps.filter(c => DEFS[c.type].board).concat(comps.filter(c => !DEFS[c.type].board));
     this.wires = (data.wires || []).map(w => ({
@@ -331,7 +331,7 @@ const app = {
     const ex = EXAMPLES.find(e => e.id === id) || EXAMPLES[0];
     this.load(ex.build());
     this.fitView();
-    this.toast('已载入示例：' + ex.name);
+    this.toast(_t('app.example_loaded') + ex.name);
   },
 
   // ---------- simulation ----------
@@ -506,7 +506,7 @@ const app = {
     for (const p of m.prims) if (p.t === 'V') maxI = Math.max(maxI, Math.abs(p.i));
     this.maxSrcI = maxI;
     if (!ok) this.noteConvFail(m, t);
-    this.warn = !ok ? '⚠ 收敛困难（已用近似解继续）' : (maxI > 500 ? '⚠ 检测到短路！电流 ' + U.fmt(maxI, 'A', 3) : '');
+    this.warn = !ok ? _t('app.convergence_difficulty_continuing_wi') : (maxI > 500 ? _t('app.short_circuit_detected_current') + U.fmt(maxI, 'A', 3) : '');
   },
   // a step that still failed after every automatic remedy: remember it, mark the components around the worst unknown,
   // show one friendly (throttled) toast; the simulation keeps running with the best-effort solution
@@ -523,9 +523,9 @@ const app = {
     cv.comps = (act.length ? act : at).slice(0, 4);
     if (now - cv.toastAt > 8000) {
       cv.toastAt = now;
-      const des = this.designators(), names = cv.comps.map(c => des.get(c) || DEFS[c.type].name).join('、');
-      const tried = [SIMOPT.autoStep && '缩小步长', SIMOPT.homotopy && 'gmin/电源步进'].filter(Boolean).join('、');
-      this.toast('⚠ t = ' + t.toFixed(4) + ' s 收敛困难：' + (tried ? '已自动尝试' + tried + '，' : '') + '以近似解继续' + (names ? '（相关元件 ' + names + ' 已用红框标出）' : '') + '。可在「高级仿真设置」中调整。');
+      const des = this.designators(), names = cv.comps.map(c => des.get(c) || DEFS[c.type].name).join(_t('app.x445'));
+      const tried = [SIMOPT.autoStep && _t('app.smaller_time_steps'), SIMOPT.homotopy && _t('app.gmin_source_stepping')].filter(Boolean).join(_t('app.x445'));
+      this.toast('⚠ t = ' + t.toFixed(4) + _t('app.s_convergence_difficulty') + (tried ? _t('app.tried') + tried + _t('app.x450') : '') + _t('app.continuing_with_an_approximate_solut') + (names ? _t('app.parts') + names + _t('app.are_outlined_in_red') : '') + _t('app.you_can_adjust_this_under_advanced_s'));
     }
   },
   advance(seconds) { const n = Math.round(seconds / this.dt); for (let i = 0; i < n; i++) this.simStep(); this.computeWireCurrents(); },
@@ -714,12 +714,12 @@ const app = {
     requestAnimationFrame((t) => this.frame(t));
   },
   updateHud() {
-    const running = this.running ? '<span class="run">● 运行中</span>' : (this.hasRun ? '<span class="pause">❚❚ 已暂停</span>' : '<span class="stop">■ 未运行 (按 ▶ 运行)</span>');
+    const running = this.running ? _t('app.running') : (this.hasRun ? _t('app.paused') : _t('app.stopped_press_to_run'));
     const cv = this.conv, now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    const cw = cv && cv.n && now - cv.at < 6000 ? '⚠ 收敛困难 ×' + cv.n + '（已自动处理，近似解继续）' : '';
-    const w = this.warn && !/收敛/.test(this.warn) ? this.warn : cw;
-    $('#hud').innerHTML = running + ' &nbsp; t = ' + this.t.toFixed(3) + ' s' + (w ? ' &nbsp; <span class="warn" title="非线性求解在部分时间步未完全收敛；仿真已自动缩小步长并使用 gmin / 电源步进，仍未收敛的步使用最佳近似解。相关元件以红框标出，可在属性面板「高级仿真设置」中调整。">' + w + '</span>' : '') + (this.wireMode ? ' &nbsp; <span class="wm">✎ 导线模式</span>' : '');
-    $('#status-stats').textContent = '元件 ' + this.comps.length + ' · 导线 ' + this.wires.length + ' · 节点 ' + (this.nodeCount || 0) + ' · 缩放 ' + Math.round(this.view.s * 100) + '%';
+    const cw = cv && cv.n && now - cv.at < 6000 ? _t('app.convergence_difficulty') + cv.n + _t('app.handled_automatically_continuing_wit') : '';
+    const w = this.warn && this.warn !== _t('app.convergence_difficulty_continuing_wi') ? this.warn : cw;
+    $('#hud').innerHTML = running + ' &nbsp; t = ' + this.t.toFixed(3) + ' s' + (w ? _t('app.x460') + w + '</span>' : '') + (this.wireMode ? _t('app.wire_mode') : '');
+    $('#status-stats').textContent = _t('app.parts_462') + this.comps.length + _t('app.wires') + this.wires.length + _t('app.nodes') + (this.nodeCount || 0) + _t('app.zoom') + Math.round(this.view.s * 100) + '%';
   },
   updateTooltip() {
     const tt = $('#tooltip'), h = this.hover;
@@ -730,9 +730,9 @@ const app = {
     if (h.comp) {
       const c = h.comp, d = DEFS[c.type], m = c._m || {};
       if (d.board) { tt.style.display = 'none'; return; }
-      if (d.readings) html = '<b>' + (this.designators().get(c) || '') + ' ' + d.name + '</b> ' + d.en + d.readings(c).map(r => '<br>' + r[0] + ' = ' + r[1]).join('');
-      else html = '<b>' + (this.designators().get(c) || '') + ' ' + d.name + '</b> ' + d.en + '<br>电压 U = ' + U.fmt(z(m.V, 1e-6), 'V') + '<br>电流 I = ' + U.fmt(z(m.I, 1e-8), 'A') + '<br>功率 P = ' + U.fmt(z(m.P, 1e-9), 'W');
-    } else if (h.wire) html = '<b>导线</b><br>电流 I = ' + U.fmt(z(h.wire._i, 1e-8), 'A') + '<br>节点电压 = ' + U.fmt(this.net && h.wire._nodes ? this.net.v(h.wire._nodes[0]) : 0, 'V');
+      if (d.readings) html = '<b>' + (this.designators().get(c) || '') + ' ' + d.name + '</b> ' + (I18N.isZh() ? d.en : '') + d.readings(c).map(r => '<br>' + r[0] + ' = ' + r[1]).join('');
+      else html = '<b>' + (this.designators().get(c) || '') + ' ' + d.name + '</b> ' + (I18N.isZh() ? d.en : '') + _t('app.voltage_u') + U.fmt(z(m.V, 1e-6), 'V') + _t('app.current_i') + U.fmt(z(m.I, 1e-8), 'A') + _t('app.power_p') + U.fmt(z(m.P, 1e-9), 'W');
+    } else if (h.wire) html = _t('app.wire_current_i') + U.fmt(z(h.wire._i, 1e-8), 'A') + _t('app.node_voltage') + U.fmt(this.net && h.wire._nodes ? this.net.v(h.wire._nodes[0]) : 0, 'V');
     else { tt.style.display = 'none'; return; }
     tt.innerHTML = html; tt.style.display = 'block';
     tt.style.left = (this.mouse[0] + 16) + 'px'; tt.style.top = (this.mouse[1] + 16) + 'px';
@@ -743,7 +743,7 @@ const app = {
   },
   updateRunBtn() {
     const b = $('#btn-run'); if (!b) return;
-    b.innerHTML = this.running ? '<span class="ic">❚❚</span> 暂停' : '<span class="ic">▶</span> 运行';
+    b.innerHTML = this.running ? _t('app.pause') : _t('app.run');
     b.classList.toggle('active', this.running);
   },
 };

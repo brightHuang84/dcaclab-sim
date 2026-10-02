@@ -4,7 +4,7 @@ const results = {}; const fails = []; const report = {};
 const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if (!cond) fails.push(name); };
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -407,7 +407,7 @@ const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if
   check('old_v1_save_loads_with_new_defaults', Math.abs(Math.abs(r.I) - 0.1) < 1e-6 && r.mode === 'yt' && r.fzoom === 1 && r.vaf === 100 && r.bf === 50, r);
 
   // ---------- 11. file:// (double-click) ----------
-  const p2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const p2 = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'zh-CN' });
   const err2 = []; p2.on('pageerror', e => err2.push(e.message));
   await p2.goto('file:///workspace/dcaclab-sim/index.html'); await p2.waitForTimeout(600);
   r = await p2.evaluate(() => { app.loadExample('halfadder'); app.pause(); app.advance(0.02); return { n: EXAMPLES.length, s: app.comps.filter(c => c.type === 'lprobe').map(p => p.state.lv).join('') }; });

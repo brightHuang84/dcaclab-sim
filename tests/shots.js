@@ -1,7 +1,7 @@
 const { chromium } = require('playwright-core');
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   page.on('pageerror', e => console.log('pageerror', e.message));
   await page.goto('http://127.0.0.1:8765/index.html?fresh=1');
   await page.waitForTimeout(400);

@@ -135,7 +135,7 @@ function meterShown(c) {
 function meterText(c) {
   const md = c.props.mode, r = meterShown(c);
   const base = c.type === 'ammeter' ? 'A' : c.type === 'voltmeter' ? 'V' : { VDC: 'V', VAC: 'V', ADC: 'A', AAC: 'A', OHM: 'Ω', CONT: 'Ω', DIODE: 'V' }[md];
-  const live = MM_OHMISH[md] && c._s && c._s.warn ? ' ⚠带电' : '';
+  const live = MM_OHMISH[md] && c._s && c._s.warn ? _t('parts.live') : '';
   const sub = live ? md + live : md === 'OHM' ? 'OHM' : md === 'CONT' ? 'CONT •))' : md === 'DIODE' ? 'DIODE →|' : (md === 'AC' || md.endsWith('AC')) ? 'AC RMS' : 'DC';
   if (c.state.fuseBlown && md[0] === 'A' && c.type === 'multimeter') return { txt: 'FUSE', unit: base, sub, val: null };
   if (r === undefined || r === null || Number.isNaN(r)) return { txt: '----', unit: base, sub, val: null };
@@ -152,14 +152,14 @@ function meterBeep(c) { const r = c.props.mode === 'CONT' ? meterShown(c) : unde
 function meterReadings(c) {
   const T = meterText(c), s = c._s || {}, md = c.props.mode, A = typeof app !== 'undefined' ? app : null;
   const out = [];
-  if (c.type === 'multimeter') out.push(['档位', (MM_MODES.find(m => m[0] === md) || [0, 0, md])[2]]);
-  out.push(['读数', '<span class="big-inline">' + T.txt + ' ' + T.unit + '</span>']);
+  if (c.type === 'multimeter') out.push([_t('common.range'), _t('c.multimeter.o.mode.' + md, null, md)]);
+  out.push([_t('common.reading'), '<span class="big-inline">' + T.txt + ' ' + T.unit + '</span>']);
   if (MM_OHMISH[md]) {
-    if (s.warn) out.push(['<span class="warn">⚠ 警告</span>', '<span class="warn">测量电阻时请断开电源！被测电路带电 (' + U.fmt(s.v0, 'V', 3) + ')，读数不可靠</span>']);
-    if (md === 'CONT') out.push(['蜂鸣', meterBeep(c) ? '♪ 导通 (&lt;' + MM_BEEP + ' Ω)' : '— 不导通']);
-    if (md === 'DIODE') out.push(['说明', '显示 1 mA 测试电流下的正向压降，反向/开路显示 OL']);
-    out.push(['测试电流', '1 mA (表内电源)']);
-  } else if (A && !A.running) out.push(['来源', s.noAC === false && (md === 'AC' || md.endsWith('AC')) ? (A.hasRun ? '暂停时的读数' : '交流量需运行仿真') : '静态工作点 (未运行也可测量)']);
+    if (s.warn) out.push([_t('parts.warning'), _t('parts.disconnect_power_before_measuring_re') + U.fmt(s.v0, 'V', 3) + _t('parts.the_reading_is_unreliable')]);
+    if (md === 'CONT') out.push([_t('parts.beep'), meterBeep(c) ? _t('parts.continuity') + MM_BEEP + ' Ω)' : _t('parts.open')]);
+    if (md === 'DIODE') out.push([_t('common.note'), _t('parts.shows_the_forward_voltage_at_a_1_ma')]);
+    out.push([_t('parts.test_current'), _t('parts.1_ma_from_the_meter')]);
+  } else if (A && !A.running) out.push([_t('parts.source'), s.noAC === false && (md === 'AC' || md.endsWith('AC')) ? (A.hasRun ? _t('parts.reading_held_at_pause') : _t('parts.ac_values_need_a_running_simulation')) : _t('parts.dc_operating_point_works_without_run')]);
   return out;
 }
 
@@ -191,7 +191,7 @@ const DEFS = {
     props: [{ k: 'Vp', label: '峰值电压', unit: 'V', def: 12 }, { k: 'f', label: '频率', unit: 'Hz', def: 50, min: 0 },
       { k: 'ph', label: '相位', unit: '°', def: 0 }, { k: 'off', label: '直流偏置', unit: 'V', def: 0 },
       { k: 'wave', label: '波形 Wave', kind: 'select', opts: [['sine', '正弦波 Sine'], ['square', '方波 Square'], ['triangle', '三角波 Triangle']], def: 'sine' }],
-    label: (c) => U.fmtShort(c.props.Vp, 'V') + ' ' + U.fmtShort(c.props.f, 'Hz') + (c.props.wave === 'square' ? ' 方波' : c.props.wave === 'triangle' ? ' 三角波' : ''),
+    label: (c) => U.fmtShort(c.props.Vp, 'V') + ' ' + U.fmtShort(c.props.f, 'Hz') + (c.props.wave === 'square' ? _t('ac.square') : c.props.wave === 'triangle' ? _t('ac.triangle') : ''),
     build(c, n, m) {
       c._p = m.addV(n[1], n[0], (t) => {
         const P = c.props, ph = P.f * t + P.ph / 360, fr = ph - Math.floor(ph);
@@ -332,7 +332,7 @@ const DEFS = {
       const P = Math.abs(c._m.V * c._m.I);
       const st = c.state; st.pAvg = (st.pAvg || 0) + (P - (st.pAvg || 0)) * Math.min(1, dt / 0.04);
       c._m.bright = st.pAvg / c.props.Pr;
-      if (!st.burnt && st.pAvg > 3 * c.props.Pr) { st.burnt = true; app.dirty = true; app.toast('💥 灯泡功率过大，已烧毁！(可在属性面板更换)'); }
+      if (!st.burnt && st.pAvg > 3 * c.props.Pr) { st.burnt = true; app.dirty = true; app.toast(_t('bulb.bulb_overloaded_and_burnt_out_replac')); }
     },
     draw(ctx, c) {
       const col = BULB_COLORS[c.props.color] || BULB_COLORS.warm;
@@ -381,7 +381,7 @@ const DEFS = {
       const st = c.state, I = Math.max(0, c._m.I);
       st.iAvg = (st.iAvg || 0) + (I - (st.iAvg || 0)) * Math.min(1, dt / 0.01);
       c._m.bright = st.iAvg / 0.02;
-      if (!st.burnt && st.iAvg > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast('💥 LED 电流过大被烧毁！请串联限流电阻。'); } }
+      if (!st.burnt && st.iAvg > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('led.led_burnt_out_by_excessive_current_a')); } }
       else st.over = 0;
     },
     draw(ctx, c) {
@@ -404,7 +404,7 @@ const DEFS = {
   switch: {
     name: '开关', en: 'Switch', cat: 'control', terms: [[-40, 0], [40, 0]], box: [-40, -34, 40, 10],
     props: [{ k: 'closed', label: '闭合', kind: 'bool', def: false }],
-    label: (c) => (c.props.closed ? '闭合 ON' : '断开 OFF'),
+    label: (c) => (c.props.closed ? _t('switch.closed_on') : _t('switch.open_off')),
     click(c, app) { c.props.closed = !c.props.closed; app.dirty = true; app.changed(); },
     shorted: (c) => (c.props.closed ? [[0, 1]] : null),
     build(c, n, m) { if (!c.props.closed) c._p = m.addR(n[0], n[1], G_OFF); },
@@ -433,7 +433,7 @@ const DEFS = {
   button: {
     name: '按钮', en: 'Push Button', cat: 'control', momentary: true, terms: [[-40, 0], [40, 0]], box: [-40, -26, 40, 10],
     props: [{ k: 'nc', label: '常闭型', kind: 'bool', def: false }],
-    label: (c) => (c.props.nc ? '常闭 NC' : '按下接通'),
+    label: (c) => (c.props.nc ? _t('button.nc') : _t('button.push_to_make')),
     shorted: (c) => (!!c.state.pressed !== !!c.props.nc ? [[0, 1]] : null),
     build(c, n, m) { if (!(!!c.state.pressed !== !!c.props.nc)) c._p = m.addR(n[0], n[1], G_OFF); },
     draw(ctx, c) {
@@ -450,13 +450,13 @@ const DEFS = {
   fuse: {
     name: '保险丝', en: 'Fuse', cat: 'control', terms: [[-40, 0], [40, 0]], box: [-40, -10, 40, 10],
     props: [{ k: 'rating', label: '额定电流', unit: 'A', def: 1, min: 1e-4 }],
-    label: (c) => (c.state.blown ? '已熔断!' : U.fmtShort(c.props.rating, 'A')),
+    label: (c) => (c.state.blown ? _t('fuse.blown') : U.fmtShort(c.props.rating, 'A')),
     build(c, n, m) { c._p = c.state.blown ? m.addR(n[0], n[1], G_OFF) : m.addV(n[0], n[1], () => 0, 0); },
     post(c, dt, app) {
       const st = c.state; if (st.blown) return;
       const r = Math.abs(c._m.I) / c.props.rating;
       st.heat = Math.max(0, (st.heat || 0) + (r * r - 1) * dt);
-      if (st.heat > 0.02) { st.blown = true; app.dirty = true; app.toast('🔥 保险丝熔断！电流超过额定值 ' + U.fmtShort(c.props.rating, 'A')); }
+      if (st.heat > 0.02) { st.blown = true; app.dirty = true; app.toast(_t('fuse.fuse_blown_current_exceeded_the_rati') + U.fmtShort(c.props.rating, 'A')); }
     },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -28, 0); D.lead(ctx, 28, 0, 40, 0);
@@ -511,7 +511,7 @@ const DEFS = {
     measure(c, m) { const n = c._nodes; c._m.V = c.props.mode[0] === 'A' ? 0 : m.v(n[1]) - m.v(n[0]); c._m.I = c._pa ? c._pa.i : 0; c._m.P = 0; },
     post(c, dt, app) {
       const md = c.props.mode, st = c.state;
-      if (!st.fuseBlown && Math.abs(c._m.I) > 10) { st.over = (st.over || 0) + dt; if (st.over > 0.01) { st.fuseBlown = true; app.dirty = true; app.toast('🔥 万用表内部 10A 保险丝熔断！(A 插孔电流过大)'); } } else st.over = 0;
+      if (!st.fuseBlown && Math.abs(c._m.I) > 10) { st.over = (st.over || 0) + dt; if (st.over > 0.01) { st.fuseBlown = true; app.dirty = true; app.toast(_t('multimeter.multimeter_s_internal_10_a_fuse_blow')); } } else st.over = 0;
       if (md === 'DIODE') c._m.reading = c._m.V;
       else if (MM_OHMISH[md]) { const den = MM_ITEST - c._m.V * MM_GSH; c._m.reading = den > 1e-9 ? c._m.V / den : Infinity; /* compensate the 1 GΩ internal shunt */ }
       else { c._res = md[0] === 'A' ? 1e-7 : 1e-6; meterUpdate(c, md[0] === 'A' ? c._m.I : c._m.V, dt, md.endsWith('AC'), app); }

@@ -8,7 +8,7 @@ const USER = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'user-7
   const only = process.env.ONLY ? process.env.ONLY.split(',') : null;
   const want = (n) => !only || only.some(o => n.startsWith(o));
   const open = async (url) => {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN', deviceScaleFactor: 1 });
     page.on('pageerror', e => console.log('pageerror', e.message));
     await page.goto(url + '?fresh=1'); await page.waitForTimeout(400);
     await page.evaluate(() => { window.HIDE = () => { const t = document.getElementById('toast'); if (t) t.classList.remove('show'); }; });
