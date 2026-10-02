@@ -3,56 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>电路实验室 · Circuit Lab — 在线电路仿真</title>
+<meta name="description" content="免费的浏览器电路仿真器：拖放元件、连线，实时仿真直流和交流电路，内置示波器、万用表、半导体、数字逻辑与常用模块，离线可用。">
+<title>电路实验室 — 在线电路仿真</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
   <header id="toolbar">
-    <div class="logo"><span class="bolt">⚡</span> 电路实验室 <small>Circuit Lab</small></div>
+    <div class="logo"><span class="bolt">⚡</span> <span data-i18n="h.logo">电路实验室</span> <small data-i18n="h.logo_sub">Circuit Lab</small></div>
     <div class="grp">
-      <button id="btn-run" class="run-btn" title="运行/暂停 (空格)"><span class="ic">▶</span> 运行</button>
-      <button id="btn-reset" title="重置仿真时间与状态">⟲ 重置</button>
+      <button id="btn-run" class="run-btn" title="运行/暂停 (空格)" data-i18n-title="h.run_title"><span class="ic">▶</span> 运行</button>
+      <button id="btn-reset" title="重置仿真时间与状态" data-i18n-title="h.reset_title">⟲ <span data-i18n="h.reset">重置</span></button>
     </div>
     <div class="grp">
-      <button id="btn-undo" title="撤销 Ctrl+Z">↶</button>
-      <button id="btn-redo" title="重做 Ctrl+Y">↷</button>
-      <button id="btn-wire" title="导线模式 (W)">✎ 导线</button>
-      <button id="btn-rot" title="旋转 (R)">⟳ 旋转</button>
-      <button id="btn-del" title="删除 (Del)">🗑 删除</button>
-      <button id="btn-clear" title="清空电路">🧹 清空</button>
-      <button id="btn-analysis" title="节点电压 / 支路电流表 (KCL)">∑ 分析</button>
+      <button id="btn-undo" title="撤销 (Ctrl+Z)" data-i18n-title="h.undo_title">↶</button>
+      <button id="btn-redo" title="重做 (Ctrl+Y)" data-i18n-title="h.redo_title">↷</button>
+      <button id="btn-wire" title="导线模式 (W)" data-i18n-title="h.wire_title">✎ <span data-i18n="h.wire">导线</span></button>
+      <button id="btn-rot" title="旋转 (R)" data-i18n-title="h.rot_title">⟳ <span data-i18n="h.rot">旋转</span></button>
+      <button id="btn-del" title="删除 (Del)" data-i18n-title="h.del_title">🗑 <span data-i18n="h.del">删除</span></button>
+      <button id="btn-clear" title="清空电路" data-i18n-title="h.clear_title">🧹 <span data-i18n="h.clear">清空</span></button>
+      <button id="btn-analysis" title="节点电压 / 支路电流表 (KCL)" data-i18n-title="h.analysis_title">∑ <span data-i18n="h.analysis">分析</span></button>
     </div>
     <div class="grp">
-      <select id="sel-example" title="示例电路"></select>
+      <select id="sel-example" title="示例电路" data-i18n-title="h.examples_title"></select>
     </div>
     <div class="grp">
-      <button id="btn-save" title="保存到浏览器 (Ctrl+S)">💾 保存</button>
-      <button id="btn-load" title="从浏览器载入">📂 载入</button>
-      <button id="btn-export" title="导出 JSON 文件">⬇ 导出</button>
-      <button id="btn-import" title="导入 JSON 文件">⬆ 导入</button>
+      <button id="btn-save" title="保存到浏览器 (Ctrl+S)" data-i18n-title="h.save_title">💾 <span data-i18n="h.save">保存</span></button>
+      <button id="btn-load" title="从浏览器载入" data-i18n-title="h.load_title">📂 <span data-i18n="h.load">载入</span></button>
+      <button id="btn-export" title="导出 JSON 文件" data-i18n-title="h.export_title">⬇ <span data-i18n="h.export">导出</span></button>
+      <button id="btn-import" title="导入 JSON 文件" data-i18n-title="h.import_title">⬆ <span data-i18n="h.import">导入</span></button>
       <input type="file" id="file-in" accept=".json,application/json" hidden>
     </div>
     <div class="grp">
-      <label class="lbl">速度
+      <label class="lbl"><span data-i18n="h.speed">速度</span>
         <select id="sel-speed">
           <option value="0.01">0.01×</option><option value="0.1">0.1×</option>
-          <option value="0.5">0.5×</option><option value="1" selected>1× 实时</option>
+          <option value="0.5">0.5×</option><option value="1" selected data-i18n="h.realtime">1× 实时</option>
           <option value="2">2×</option><option value="5">5×</option>
         </select></label>
-      <label class="lbl"><input type="checkbox" id="chk-current" checked> 电流动画</label>
+      <label class="lbl"><input type="checkbox" id="chk-current" checked> <span data-i18n="h.current_anim">电流动画</span></label>
+    </div>
+    <div class="grp grp-lang">
+      <label class="lbl" title="界面语言 / Language" data-i18n-title="h.lang_title">🌐 <select id="sel-lang" aria-label="Language"></select></label>
     </div>
   </header>
   <aside id="palette">
-    <div class="side-t">元件库 <small>Components</small></div>
+    <div class="side-t"><span data-i18n="h.palette">元件库</span> <small data-i18n="h.palette_sub">Components</small></div>
     <div id="palette-body"></div>
   </aside>
   <main id="stage">
     <canvas id="cv"></canvas>
     <div id="hud"></div>
     <div id="toast"></div>
-    <div id="zoombox"><button id="btn-zin" title="放大">＋</button><button id="btn-fit" title="适配视图">⤢</button><button id="btn-zout" title="缩小">－</button></div>
+    <div id="zoombox"><button id="btn-zin" title="放大" data-i18n-title="h.zoom_in">＋</button><button id="btn-fit" title="适配视图" data-i18n-title="h.fit">⤢</button><button id="btn-zout" title="缩小" data-i18n-title="h.zoom_out">－</button></div>
     <div id="tooltip"></div>
     <div id="analysis"></div>
   </main>
@@ -60,10 +64,21 @@
     <div id="props-body"></div>
   </aside>
   <footer id="status">
-    <span>提示：从端子拖动连线 · 单击开关切换 · 滚轮缩放 · 拖动空白处平移</span>
+    <span data-i18n="h.status_tip">提示：从端子拖动连线 · 单击开关切换 · 滚轮缩放 · 拖动空白处平移</span>
     <span id="status-stats"></span>
   </footer>
 </div>
+<script src="js/i18n.js"></script>
+<script src="js/locales/zh-CN.js"></script>
+<script src="js/locales/zh-TW.js"></script>
+<script src="js/locales/en.js"></script>
+<script src="js/locales/ja.js"></script>
+<script src="js/locales/ko.js"></script>
+<script src="js/locales/es.js"></script>
+<script src="js/locales/fr.js"></script>
+<script src="js/locales/de.js"></script>
+<script src="js/locales/ru.js"></script>
+<script src="js/locales/pt-BR.js"></script>
 <script src="js/util.js"></script>
 <script src="js/solver.js"></script>
 <script src="js/components.js"></script>

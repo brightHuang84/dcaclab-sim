@@ -4,7 +4,7 @@ const results = {}; const fails = [];
 const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if (!cond) fails.push(name); };
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -322,7 +322,7 @@ const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if
   check('perf_realtime', Object.values(r).every(s => parseFloat(s) < 500), r);
 
   // ---- 14. file:// protocol ----
-  const p2 = await browser.newPage();
+  const p2 = await browser.newPage({ locale: 'zh-CN' });
   const err2 = []; p2.on('pageerror', e => err2.push(e.message));
   await p2.goto('file:///workspace/dcaclab-sim/index.html'); await p2.waitForTimeout(500);
   r = await p2.evaluate(() => { app.loadExample('ne555'); app.pause(); app.advance(3); return app.comps.find(c => c.type === 'ic555').state.freq; });

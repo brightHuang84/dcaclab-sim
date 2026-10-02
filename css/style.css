@@ -1,5 +1,11 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; color: #243142; background: #dfe6ee; }
+/* per-language font stacks (Latin/Cyrillic first for western locales so punctuation like ’ “ » is not taken from a CJK font) */
+:root { --ui-font: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Helvetica Neue", Arial, "Noto Sans CJK SC", sans-serif; }
+:root:lang(zh) { --ui-font: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+:root:lang(zh-TW) { --ui-font: "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", sans-serif; }
+:root:lang(ja) { --ui-font: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans CJK JP", sans-serif; }
+:root:lang(ko) { --ui-font: "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif; }
+html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--ui-font); color: #243142; background: #dfe6ee; }
 #app { display: grid; height: 100vh; grid-template-columns: 196px 1fr 250px; grid-template-rows: auto 1fr 26px; grid-template-areas: "tb tb tb" "pal stage props" "st st st"; }
 #toolbar { grid-area: tb; display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; gap: 4px; padding: 6px 8px; background: linear-gradient(180deg, #2b7de0, #1b5fb8); box-shadow: 0 2px 6px rgba(0,0,0,.2); z-index: 3; }
 .logo { color: #fff; font-weight: 700; font-size: 16px; margin-right: 4px; white-space: nowrap; }
@@ -22,7 +28,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Segoe UI",
 .item:hover { box-shadow: 0 3px 10px rgba(30,95,184,.18); transform: translateY(-1px); border-color: #9cc3f0; }
 .item.active { background: #fff6cc; border-color: #f2b705; }
 .item canvas { display: block; margin: 0 auto; }
-.item span { display: block; font-size: 12px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.item span { display: block; font-size: 12px; font-weight: 600; line-height: 1.25; overflow-wrap: break-word; hyphens: auto; }
 .item small { display: block; font-size: 9px; color: #8a97a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #stage { grid-area: stage; position: relative; overflow: hidden; }
 #cv { position: absolute; left: 0; top: 0; touch-action: none; }
@@ -86,3 +92,14 @@ kbd { background: #eef2f6; border: 1px solid #c5d0dc; border-radius: 3px; paddin
 #analysis td.mem { white-space: normal; color: #53657a; font-size: 11px; }
 #analysis td.ok { color: #2a9d3a; } #analysis td.bad { color: #d62828; font-weight: 700; }
 #scope-big { display: block; margin: 0 0 8px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+/* i18n: language picker sits at the right end of the toolbar; on desktop the toolbar wraps instead of hiding buttons
+   when a language has long labels; Latin/Cyrillic part names get a slightly smaller font in the palette */
+.grp-lang { margin-left: auto; }
+#toolbar #sel-example { max-width: 210px; text-overflow: ellipsis; }
+@media (min-width: 901px) { #toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: 5px; } }
+html:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)) .item span { font-size: 11px; letter-spacing: -.1px; }
+html:lang(de) .item span { font-size: 10.5px; letter-spacing: -.2px; }
+html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
+#toolbar #sel-lang { max-width: 150px; }
+#toolbar #sel-lang { padding: 4px 6px; }
+.logo small:empty, .side-t small:empty { display: none; }

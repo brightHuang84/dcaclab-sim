@@ -4,7 +4,7 @@ const results = {}; const fails = []; const report = {};
 const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if (!cond) fails.push(name); };
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -61,7 +61,7 @@ const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if
   check('vin_below_min_off', Math.abs(r.low.Vout) < 1e-3 && Math.abs(r.low.Iin) < 1e-6 && /输入过低/.test(r.low.status), r.low);
   check('vin_above_vout_pass_through', near(r.pass.Vout, 15 - 0.4, 0.05) && /直通/.test(r.pass.status) && r.pass.Iin >= r.pass.Iout, r.pass);
   check('weak_battery_sags_still_regulates', near(r.sag.Vin, 3.04, 0.03) && near(r.sag.Vout, 12, 0.012) && near(r.sag.Iin * r.sag.Vin, r.sag.Pout / 0.9, 0.05), r.sag);
-  check('too_weak_battery_brownout_converges', /Brown-out|输入过低/.test(r.weak.status) && r.weak.bad === 0 && r.weak.warn === '', r.weak);
+  check('too_weak_battery_brownout_converges', /Brown-out|输入过低|输入功率不足/.test(r.weak.status) && r.weak.bad === 0 && r.weak.warn === '', r.weak);
   check('no_load_regulates', near(r.noload.Vout, 12, 0.012) && Math.abs(r.noload.Iin) < 1e-4, r.noload);
   check('uvlo_hysteresis', /正常/.test(r.hyst.status) && /输入过低/.test(r.hystOff.status), [r.hyst, r.hystOff]);
 

@@ -8,10 +8,10 @@ Object.assign(app, {
     if (!s) { el.innerHTML = this.helpHtml(); this.bindSettings(); return; }
     if (s.wire) {
       const w = s.wire;
-      el.innerHTML = '<div class="ph"><div class="pt">导线 <small>Wire</small><div class="pid">' + w.pts.length + ' 个顶点 vertices</div></div></div>' +
-        '<div class="field"><label>颜色</label><div class="swatches">' + WIRE_COLORS.map(c => '<button class="sw' + (c === w.color ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '</div></div>' +
-        '<div class="btns"><button id="p-bend">↱ 重置为直角</button><button id="p-del" class="danger">🗑 删除</button></div>' +
-        '<div class="hint">拖动线段可平移；拖动方形顶点可改变折线；双击导线添加顶点，双击顶点删除。</div>' +
+      el.innerHTML = _t('ui.wire') + w.pts.length + _t('ui.vertices') +
+        _t('ui.color') + WIRE_COLORS.map(c => '<button class="sw' + (c === w.color ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '</div></div>' +
+        _t('ui.reset_to_right_angle_delete') +
+        _t('ui.drag_a_segment_to_move_it_drag_the_s') +
         '<div id="readings" class="readings"></div>';
       el.querySelectorAll('.sw').forEach(b => b.onclick = () => { w.color = b.dataset.c; this.wireColor = w.color; this.changed(); this.refreshProps(); });
       $('#p-bend').onclick = () => { this.rotateSel(); this.refreshProps(); };
@@ -19,7 +19,7 @@ Object.assign(app, {
       this.updateReadings(true); return;
     }
     const c = s.comp, d = DEFS[c.type];
-    let h = '<div class="ph"><canvas class="picon" width="56" height="40"></canvas><div class="pt">' + d.name + ' <small>' + d.en + '</small><div class="pid">' + (this.designators().get(c) || '') + ' · #' + c.id + '</div></div></div>';
+    let h = '<div class="ph"><canvas class="picon" width="56" height="40"></canvas><div class="pt">' + d.name + (I18N.isZh() ? ' <small>' + d.en + '</small>' : '') + '<div class="pid">' + (this.designators().get(c) || '') + ' · #' + c.id + '</div></div></div>';
     if (c.type === 'scope') h += '<canvas id="scope-big" width="226" height="170"></canvas>';
     for (const p of d.props) {
       const v = c.props[p.k];
@@ -31,15 +31,15 @@ Object.assign(app, {
       else h += '<div class="field"><label>' + p.label + '</label><div class="numrow"><input type="text" data-k="' + p.k + '" value="' + (v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '')) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
     }
     const extra = [];
-    if (c.type === 'switch') extra.push('<button id="p-toggle" class="primary">' + (c.props.closed ? '断开开关' : '闭合开关') + '</button>');
-    if (c.type === 'fuse' && c.state.blown) extra.push('<button id="p-fix" class="primary">🔧 更换保险丝</button>');
-    if (c.type === 'multimeter' && c.state.fuseBlown) extra.push('<button id="p-fix" class="primary">🔧 更换表内保险丝</button>');
-    if (c.state.burnt) extra.push('<button id="p-fix" class="primary">🔧 更换新的</button>');
-    if (c.type === 'capacitor') extra.push('<button id="p-discharge">⚡ 放电</button>');
-    h += '<div class="btns">' + extra.join('') + '<button id="p-rot">⟳ 旋转 (R)</button><button id="p-dup">⧉ 复制</button><button id="p-del" class="danger">🗑 删除</button></div>';
+    if (c.type === 'switch') extra.push('<button id="p-toggle" class="primary">' + (c.props.closed ? _t('ui.open_switch') : _t('ui.close_switch')) + '</button>');
+    if (c.type === 'fuse' && c.state.blown) extra.push(_t('ui.replace_fuse'));
+    if (c.type === 'multimeter' && c.state.fuseBlown) extra.push(_t('ui.replace_meter_fuse'));
+    if (c.state.burnt) extra.push(_t('ui.replace_with_new'));
+    if (c.type === 'capacitor') extra.push(_t('ui.discharge'));
+    h += '<div class="btns">' + extra.join('') + _t('ui.rotate_r_duplicate_delete');
     h += '<div id="readings" class="readings"></div>';
-    if (d.termNames) h += '<div class="hint">端子: ' + d.termNames.join(' / ') + '</div>';
-    if (d.board) h += '<div class="hint">每列 a–e、f–j 五孔相通；上下两侧电源轨整行相通；中间凹槽两侧不相通。拖动面包板会带着插在上面的元件一起移动。悬停孔位可高亮其连通组。</div>';
+    if (d.termNames) h += _t('ui.terminals') + d.termNames.join(' / ') + '</div>';
+    if (d.board) h += _t('ui.each_column_a_e_and_f_j_has_five_con');
     el.innerHTML = h;
     this.drawThumb(el.querySelector('.picon'), c.type, c);
     el.querySelectorAll('input.tprop').forEach(inp => { inp.onchange = () => { c.props[inp.dataset.k] = inp.value.slice(0, 40); this.dirty = true; this.changed(); }; inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); }; });
@@ -47,7 +47,7 @@ Object.assign(app, {
       const pd = d.props.find(p => p.k === inp.dataset.k);
       inp.onchange = () => {
         const v = U.parseSI(inp.value);
-        if (!isFinite(v) || (pd.min !== undefined && v < pd.min) || (pd.max !== undefined && v > pd.max)) { inp.classList.add('bad'); this.toast('无效数值：' + inp.value + (pd.max !== undefined ? ' (范围 ' + pd.min + '…' + pd.max + ')' : '')); return; }
+        if (!isFinite(v) || (pd.min !== undefined && v < pd.min) || (pd.max !== undefined && v > pd.max)) { inp.classList.add('bad'); this.toast(_t('ui.invalid_value') + inp.value + (pd.max !== undefined ? _t('ui.range') + pd.min + '…' + pd.max + ')' : '')); return; }
         inp.classList.remove('bad'); c.props[pd.k] = v; this.dirty = true; this.changed();
         inp.value = v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '');
       };
@@ -68,8 +68,8 @@ Object.assign(app, {
     el.querySelectorAll('.sw').forEach(b => b.onclick = () => { c.props[b.dataset.k] = b.dataset.v; this.dirty = true; this.changed(); this.refreshProps(); });
     const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = f; };
     on('p-toggle', () => { DEFS.switch.click(c, this); this.refreshProps(); });
-    on('p-fix', () => { c.state = {}; this.dirty = true; this.refreshProps(); this.toast('已更换'); });
-    on('p-discharge', () => { c.state.v = 0; c.state.i = 0; this.dirty = true; this.toast('电容已放电'); });
+    on('p-fix', () => { c.state = {}; this.dirty = true; this.refreshProps(); this.toast(_t('ui.replaced')); });
+    on('p-discharge', () => { c.state.v = 0; c.state.i = 0; this.dirty = true; this.toast(_t('ui.capacitor_discharged')); });
     on('p-rot', () => this.rotateSel());
     on('p-dup', () => this.duplicateSel());
     on('p-del', () => this.deleteSel());
@@ -79,7 +79,7 @@ Object.assign(app, {
     const r = document.getElementById('readings'); if (!r || !this.sel) return;
     if (!force && !this.running) return;
     const z = (v, e) => (Math.abs(v) < e ? 0 : v);
-    if (this.sel.wire) { r.innerHTML = '<div class="rt">实时读数</div><div>电流 I<b>' + U.fmt(z(this.sel.wire._i, 1e-8), 'A') + '</b></div>'; return; }
+    if (this.sel.wire) { r.innerHTML = _t('ui.live_readings_current_i') + U.fmt(z(this.sel.wire._i, 1e-8), 'A') + '</b></div>'; return; }
     const c = this.sel.comp, m = c._m || {};
     const big = document.getElementById('scope-big');
     if (big) {
@@ -88,72 +88,72 @@ Object.assign(app, {
       const ctx = big.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawScopeScreen(ctx, c, 0, 0, 226, 170, true);
     }
     if (DEFS[c.type].board) { r.innerHTML = ''; return; }
-    let h = '<div class="rt">实时读数 Live</div>';
+    let h = _t('ui.live_readings');
     if (typeof METER_TYPES !== 'undefined' && METER_TYPES.has(c.type)) {   // meters read even when stopped (static solve)
       const T = meterText(c);
       h += '<div class="big">' + T.txt + ' ' + T.unit + (c._s && c._s.warn && MM_OHMISH[c.props.mode] ? ' <span class="warn">⚠</span>' : '') + '</div>';
-      for (const [k, v] of meterReadings(c)) if (k !== '读数') h += '<div>' + k + '<b>' + v + '</b></div>';
-      if (c.state.fuseBlown) h += '<div class="warn">表内保险丝已熔断 (A 档不可用)</div>';
+      for (const [k, v] of meterReadings(c)) if (k !== _t('common.reading')) h += '<div>' + k + '<b>' + v + '</b></div>';
+      if (c.state.fuseBlown) h += _t('ui.meter_fuse_blown_a_range_unavailable');
       r.innerHTML = h; return;
     }
-    if (!this.hasRun) h += '<div class="muted">运行仿真后显示读数</div>';
+    if (!this.hasRun) h += _t('ui.run_the_simulation_to_see_readings');
     else {
       if (m.reading !== undefined) {
         const md = c.props.mode || 'DC';
         const unit = c.type === 'ammeter' ? 'A' : c.type === 'voltmeter' ? 'V' : (md === 'OHM' ? 'Ω' : md[0]);
-        const txt = unit === 'Ω' && !(m.reading < 2e7) ? 'OL (开路)' : U.fmt(m.reading, unit);
+        const txt = unit === 'Ω' && !(m.reading < 2e7) ? _t('ui.ol_open') : U.fmt(m.reading, unit);
         h += '<div class="big">' + txt + '</div>';
       }
       if (c.type === 'npn' || c.type === 'pnp') {
-        h += '<div>集电极电流 Ic<b>' + U.fmt(z(m.I, 1e-9), 'A') + '</b></div><div>基极电流 Ib<b>' + U.fmt(z(m.Ib, 1e-10), 'A') + '</b></div>' +
+        h += _t('ui.collector_current_ic') + U.fmt(z(m.I, 1e-9), 'A') + _t('ui.base_current_ib') + U.fmt(z(m.Ib, 1e-10), 'A') + '</b></div>' +
           '<div>Vce<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div><div>Vbe<b>' + U.fmt(z(m.Vbe, 1e-6), 'V') + '</b></div>' +
-          '<div>Ic/Ib<b>' + (Math.abs(m.Ib) > 1e-10 ? (m.I / m.Ib).toFixed(1) : '—') + '</b></div><div>状态<b>' + this.bjtRegion(c) + '</b></div>';
+          '<div>Ic/Ib<b>' + (Math.abs(m.Ib) > 1e-10 ? (m.I / m.Ib).toFixed(1) : '—') + _t('ui.state') + this.bjtRegion(c) + '</b></div>';
       } else if (c.type === 'nmos') {
-        h += '<div>漏极电流 Id<b>' + U.fmt(z(m.I, 1e-9), 'A') + '</b></div><div>Vgs<b>' + U.fmt(z(m.Vgs, 1e-6), 'V') + '</b></div><div>Vds<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div>';
+        h += _t('ui.drain_current_id') + U.fmt(z(m.I, 1e-9), 'A') + '</b></div><div>Vgs<b>' + U.fmt(z(m.Vgs, 1e-6), 'V') + '</b></div><div>Vds<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div>';
       } else if (c.type === 'ic555') {
-        h += '<div>输出 OUT<b>' + (c.state.q ? '高 HIGH' : '低 LOW') + '</b></div><div>输出电压<b>' + U.fmt(m.V, 'V') + '</b></div><div>测得频率<b>' + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
+        h += _t('ui.output_out') + (c.state.q ? _t('ui.high') : _t('ui.low')) + _t('ui.output_voltage') + U.fmt(m.V, 'V') + _t('ui.measured_frequency') + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
       } else if (DEFS[c.type].readings) {
         for (const [k, v] of DEFS[c.type].readings(c)) h += '<div>' + k + '<b>' + v + '</b></div>';
       } else if (c.type === 'scope') {
-        h += '<div>CH1<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div><div>CH2<b>' + U.fmt(z(m.V2, 1e-6), 'V') + '</b></div><div>频率 (CH1)<b>' + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
-        if (c.props.mode === 'fft') { const F = scopeFFT(c); if (F) h += '<div>FFT 峰值 CH1<b>' + U.fmt(F.p1.f, 'Hz', 4) + ' / ' + U.fmt(F.p1.a, 'V', 3) + '</b></div><div>FFT 分辨率<b>' + U.fmt(F.f1.df, 'Hz', 3) + '</b></div>'; }
+        h += '<div>CH1<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div><div>CH2<b>' + U.fmt(z(m.V2, 1e-6), 'V') + _t('ui.frequency_ch1') + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
+        if (c.props.mode === 'fft') { const F = scopeFFT(c); if (F) h += _t('ui.fft_peak_ch1') + U.fmt(F.p1.f, 'Hz', 4) + ' / ' + U.fmt(F.p1.a, 'V', 3) + _t('ui.fft_resolution') + U.fmt(F.f1.df, 'Hz', 3) + '</b></div>'; }
       } else {
         const signed = ['ammeter', 'voltmeter', 'multimeter', 'battery', 'ac'].includes(c.type);
         const absI = signed ? m.I : Math.abs(m.I), absV = signed ? m.V : Math.abs(m.V);
-        h += '<div>电压 U<b>' + U.fmt(z(absV, 1e-6), 'V') + '</b></div><div>电流 I<b>' + U.fmt(z(absI, 1e-8), 'A') + '</b></div><div>功率 P<b>' + U.fmt(z(m.P, 1e-9), 'W') + '</b></div>';
+        h += _t('ui.voltage_u') + U.fmt(z(absV, 1e-6), 'V') + _t('ui.current_i') + U.fmt(z(absI, 1e-8), 'A') + _t('ui.power_p') + U.fmt(z(m.P, 1e-9), 'W') + '</b></div>';
       }
-      if (m.bright !== undefined) h += '<div>亮度<b>' + Math.round(U.clamp(m.bright, 0, 9.99) * 100) + '%</b></div>';
-      if (c.type === 'capacitor') h += '<div>电容电压<b>' + U.fmt(z(c.state.v || 0, 1e-6), 'V') + '</b></div>';
-      if (c.state.blown) h += '<div class="warn">保险丝已熔断</div>';
-      if (c.state.fuseBlown) h += '<div class="warn">表内保险丝已熔断 (A 档不可用)</div>';
-      if (c.state.burnt) h += '<div class="warn">已烧毁</div>';
+      if (m.bright !== undefined) h += _t('ui.brightness') + Math.round(U.clamp(m.bright, 0, 9.99) * 100) + '%</b></div>';
+      if (c.type === 'capacitor') h += _t('ui.capacitor_voltage') + U.fmt(z(c.state.v || 0, 1e-6), 'V') + '</b></div>';
+      if (c.state.blown) h += _t('ui.fuse_blown');
+      if (c.state.fuseBlown) h += _t('ui.meter_fuse_blown_a_range_unavailable');
+      if (c.state.burnt) h += _t('ui.burnt_out');
     }
     r.innerHTML = h;
   },
   bjtRegion(c) {
     const vbe = (c._m.Vbe || 0) * (c.type === 'pnp' ? -1 : 1), vce = (c._m.V || 0) * (c.type === 'pnp' ? -1 : 1);
-    if (vbe < 0.5) return '截止 cut-off';
-    if (vce < 0.3) return '饱和 saturation';
-    return '放大 active';
+    if (vbe < 0.5) return _t('ui.cut_off');
+    if (vce < 0.3) return _t('ui.saturation');
+    return _t('ui.active');
   },
   helpHtml() {
-    return '<div class="ph"><div class="pt">属性 <small>Properties</small></div></div>' +
-      '<div class="muted">选中一个元件或导线即可编辑参数。</div>' +
-      '<div class="help"><div class="rt">操作说明</div><ul>' +
-      '<li>从左侧拖动元件到工作台（或单击添加）</li>' +
-      '<li>从端子（金色圆点）拖出即可<b>连线</b>；把导线端点放到另一根导线中间会自动<b>分叉连接</b></li>' +
-      '<li>拖动导线线段可平移；选中后拖动方形顶点；<b>双击</b>导线加顶点，双击顶点删除</li>' +
-      '<li><kbd>Shift</kbd>+拖动导线中部（或导线模式下）可从导线中间引出分支</li>' +
-      '<li>单击开关切换；按住按钮接通；单击万用表旋钮换档</li>' +
-      '<li>在电位器/可变电阻上滚动滚轮调节</li>' +
-      '<li>拖动空白处平移，滚轮缩放；触屏支持双指缩放/平移</li>' +
-      '<li><kbd>R</kbd> 旋转 · <kbd>Del</kbd> 删除 · <kbd>空格</kbd> 运行/暂停</li>' +
-      '<li><kbd>Ctrl+Z</kbd> 撤销 · <kbd>Ctrl+D</kbd> 复制 · <kbd>W</kbd> 导线模式</li>' +
-      '<li>导线恰好经过端子时<b>自动接通</b>；<span style="color:#ff7a00">橙色虚线圈</span> = 经过但未连接，按 <kbd>J</kbd> 连接</li>' +
+    return _t('ui.properties') +
+      _t('ui.select_a_part_or_wire_to_edit_its_pa') +
+      _t('ui.how_to_use') +
+      _t('ui.drag_parts_from_the_left_onto_the_wo') +
+      _t('ui.drag_from_a_terminal_gold_dot_to_dra') +
+      _t('ui.drag_a_wire_segment_to_move_it_selec') +
+      _t('ui.shift_drag_the_middle_of_a_wire_or_u') +
+      _t('ui.click_a_switch_to_toggle_it_hold_a_p') +
+      _t('ui.scroll_the_mouse_wheel_over_a_potent') +
+      _t('ui.drag_empty_space_to_pan_scroll_to_zo') +
+      _t('ui.r_rotate_del_delete_space_run_pause') +
+      _t('ui.ctrl_z_undo_ctrl_d_duplicate_w_wire') +
+      _t('ui.a_wire_passing_exactly_over_a_termin') +
       '</ul></div>' +
-      '<div class="help"><div class="rt">仿真设置</div>' +
-      '<div class="field"><label>时间步长 Δt</label><div class="numrow"><input type="text" id="set-dt" value="' + U.fmtShort(this.dt, '').replace(/\s/g, '') + '"><span class="unit">s</span></div></div>' +
-      '<div class="field"><label class="chk"><input type="checkbox" id="set-electron"' + (this.electron ? ' checked' : '') + '> 显示电子流方向（默认为常规电流方向）</label></div></div>' +
+      _t('ui.simulation_settings') +
+      _t('ui.time_step_t_input_type_text_id_set_d') + U.fmtShort(this.dt, '').replace(/\s/g, '') + '"><span class="unit">s</span></div></div>' +
+      '<div class="field"><label class="chk"><input type="checkbox" id="set-electron"' + (this.electron ? ' checked' : '') + _t('ui.show_electron_flow_default_conventio') +
       this.advSettingsHtml();
   },
   // advanced solver options: defaults work for every circuit; shown collapsed
@@ -161,18 +161,18 @@ Object.assign(app, {
     const o = SIMOPT, num = (k, label, unit, hint) => '<div class="field"><label>' + label + (hint ? ' <small class="muted">' + hint + '</small>' : '') + '</label><div class="numrow"><input type="text" class="simopt" data-k="' + k + '" value="' + (k === 'maxIter' ? o[k] : U.fmtShort(o[k], '').replace(/\s/g, '')) + '"><span class="unit">' + unit + '</span></div></div>';
     const chk = (k, label) => '<div class="field"><label class="chk"><input type="checkbox" class="simopt" data-k="' + k + '"' + (o[k] ? ' checked' : '') + '> ' + label + '</label></div>';
     const st = this.net && this.net.stats, cv = this.conv;
-    const stats = st ? '<div class="muted adv-stats">本次运行：自动恢复 ' + (st.hard - st.fail) + ' 步（缩小步长 ' + st.cut + '，gmin 步进 ' + st.gmin + '，电源步进 ' + st.src + '）· 未收敛 ' + st.fail + ' 步' + (cv && cv.n ? '（最近 t = ' + cv.t.toFixed(4) + ' s）' : '') + '</div>' : '';
+    const stats = st ? _t('ui.this_run_recovered_automatically') + (st.hard - st.fail) + _t('ui.steps_time_step_cuts') + st.cut + _t('ui.gmin_stepping') + st.gmin + _t('ui.source_stepping') + st.src + _t('ui.not_converged') + st.fail + _t('ui.steps') + (cv && cv.n ? _t('ui.latest_t') + cv.t.toFixed(4) + _t('ui.s') : '') + '</div>' : '';
     const changed = Object.keys(SIMOPT_DEFAULTS).some(k => SIMOPT[k] !== SIMOPT_DEFAULTS[k]);
-    return '<details class="help adv"' + (this._advOpen ? ' open' : '') + '><summary class="rt">高级仿真设置 <small>Advanced' + (changed ? ' · 已修改' : '') + '</small></summary>' +
-      '<div class="muted">默认值适用于所有电路，一般无需修改。求解困难时会自动缩小步长并使用 gmin / 电源步进。</div>' +
-      num('maxIter', '最大迭代次数', '次', '每个时间步') + num('reltol', '相对容差 RELTOL', '') + num('vntol', '电压容差 VNTOL', 'V') + num('abstol', '电流容差 ABSTOL', 'A') +
-      num('gmin', '最小电导 GMIN', 'S', '节点对地') + chk('autoStep', '自动步长（不收敛时自动缩小时间步重试）') + num('minStep', '最小步长', 's') +
-      chk('homotopy', 'gmin 步进 / 电源步进（收敛辅助）') + chk('kclCheck', 'KCL 残差收敛判据（浮空节点抗舍入抖动）') +
-      '<div class="field"><button id="simopt-reset" class="btn">恢复默认</button></div>' + stats + '</details>';
+    return '<details class="help adv"' + (this._advOpen ? ' open' : '') + _t('ui.advanced_simulation_settings') + (changed ? _t('ui.modified') : '') + '</small></summary>' +
+      _t('ui.the_defaults_work_for_every_circuit') +
+      num('maxIter', _t('ui.max_iterations'), _t('ui.x829'), _t('ui.per_time_step')) + num('reltol', _t('ui.relative_tolerance_reltol'), '') + num('vntol', _t('ui.voltage_tolerance_vntol'), 'V') + num('abstol', _t('ui.current_tolerance_abstol'), 'A') +
+      num('gmin', _t('ui.minimum_conductance_gmin'), 'S', _t('ui.node_to_ground')) + chk('autoStep', _t('ui.automatic_time_step_retry_with_small')) + num('minStep', _t('ui.minimum_time_step'), 's') +
+      chk('homotopy', _t('ui.gmin_stepping_source_stepping_conver')) + chk('kclCheck', _t('ui.kcl_residual_convergence_check_robus')) +
+      _t('ui.restore_defaults') + stats + '</details>';
   },
   bindSettings() {
     const dt = $('#set-dt');
-    if (dt) dt.onchange = () => { const v = U.parseSI(dt.value); if (v > 1e-7 && v < 0.1) { this.dt = v; this.dirty = true; this.toast('步长 = ' + U.fmt(v, 's')); } else this.toast('步长需在 0.1µs ~ 100ms 之间'); };
+    if (dt) dt.onchange = () => { const v = U.parseSI(dt.value); if (v > 1e-7 && v < 0.1) { this.dt = v; this.dirty = true; this.toast(_t('ui.time_step') + U.fmt(v, 's')); } else this.toast(_t('ui.the_time_step_must_be_between_0_1_s')); };
     const el = $('#set-electron'); if (el) el.onchange = () => { this.electron = el.checked; };
     const adv = document.querySelector('details.adv'); if (adv) adv.ontoggle = () => { this._advOpen = adv.open; };
     const LIM = { maxIter: [5, 2000], reltol: [1e-9, 0.1], vntol: [1e-12, 1e-2], abstol: [1e-15, 1e-2], gmin: [1e-18, 1e-6], minStep: [1e-15, 1e-3] };
@@ -182,13 +182,13 @@ Object.assign(app, {
         if (inp.type === 'checkbox') SIMOPT[k] = inp.checked;
         else {
           let v = U.parseSI(inp.value); const [lo, hi] = LIM[k];
-          if (!(v >= lo && v <= hi)) { this.toast('取值范围 ' + U.fmtShort(lo, '') + ' ~ ' + U.fmtShort(hi, '')); inp.value = k === 'maxIter' ? SIMOPT[k] : U.fmtShort(SIMOPT[k], '').replace(/\s/g, ''); return; }
+          if (!(v >= lo && v <= hi)) { this.toast(_t('ui.allowed_range') + U.fmtShort(lo, '') + ' ~ ' + U.fmtShort(hi, '')); inp.value = k === 'maxIter' ? SIMOPT[k] : U.fmtShort(SIMOPT[k], '').replace(/\s/g, ''); return; }
           SIMOPT[k] = k === 'maxIter' ? Math.round(v) : v;
         }
-        saveSimOpt(); this.dirty = true; this.toast('已更新仿真设置：' + k + ' = ' + SIMOPT[k]);
+        saveSimOpt(); this.dirty = true; this.toast(_t('ui.simulation_setting_updated') + k + ' = ' + SIMOPT[k]);
       };
     });
-    const rb = $('#simopt-reset'); if (rb) rb.onclick = () => { Object.assign(SIMOPT, SIMOPT_DEFAULTS); saveSimOpt(); this.dirty = true; this.toast('已恢复默认仿真设置'); if (!this.sel) this.refreshProps(); };
+    const rb = $('#simopt-reset'); if (rb) rb.onclick = () => { Object.assign(SIMOPT, SIMOPT_DEFAULTS); saveSimOpt(); this.dirty = true; this.toast(_t('ui.simulation_settings_restored_to_defa')); if (!this.sel) this.refreshProps(); };
   },
   drawThumb(cv, type, comp) {
     const ctx = cv.getContext('2d'), d = DEFS[type], dpr = window.devicePixelRatio || 1;
@@ -214,14 +214,14 @@ Object.assign(app, {
     if (!this.net || this.dirty) this.rebuild();
     const A = this.analysis(); if (!A) return;
     const z = (v, e) => (Math.abs(v) < e ? 0 : v);
-    let h = '<div class="an-h"><b>∑ 电路分析 Circuit Analysis</b><button id="an-close">✕</button></div>';
-    h += '<div class="an-note">基尔霍夫电流定律 (KCL)：流入每个节点的电流代数和应为 0。元件表中无源元件的 U、I 以实际电流方向为正。' + (this.hasRun ? '' : ' <b>请先运行仿真</b>') + '</div>';
-    h += '<table><tr><th>节点</th><th>电压</th><th>KCL Σi</th><th>连接的端子</th></tr>';
+    let h = _t('ui.circuit_analysis');
+    h += _t('ui.kirchhoff_s_current_law_kcl_the_alge') + (this.hasRun ? '' : _t('ui.run_the_simulation_first')) + '</div>';
+    h += _t('ui.node_voltage_kcl_i_connected_termina');
     for (const n of A.nodes) {
       const ok = Math.abs(n.kcl) < 1e-6 || n.n === 0;
-      h += '<tr><td>' + (n.n === 0 ? 'GND (0)' : 'N' + n.n) + '</td><td>' + U.fmt(z(n.V, 1e-9), 'V') + '</td><td class="' + (ok ? 'ok' : 'bad') + '">' + (n.n === 0 ? '参考点' : (ok ? '✓ ' : '') + U.fmt(z(n.kcl, 1e-9), 'A', 2)) + '</td><td class="mem">' + n.members.join(', ') + '</td></tr>';
+      h += '<tr><td>' + (n.n === 0 ? 'GND (0)' : 'N' + n.n) + '</td><td>' + U.fmt(z(n.V, 1e-9), 'V') + '</td><td class="' + (ok ? 'ok' : 'bad') + '">' + (n.n === 0 ? _t('ui.reference') : (ok ? '✓ ' : '') + U.fmt(z(n.kcl, 1e-9), 'A', 2)) + '</td><td class="mem">' + n.members.join(', ') + '</td></tr>';
     }
-    h += '</table><table><tr><th>元件</th><th>类型</th><th>电压 U</th><th>电流 I</th><th>功率 P</th></tr>';
+    h += _t('ui.part_type_voltage_u_current_i_power');
     for (const r of A.comps) { const sg = ['ammeter', 'voltmeter', 'multimeter', 'battery', 'ac'].includes(r.c.type) ? 1 : Math.sign(r.I) || 1; h += '<tr><td>' + r.name + '</td><td>' + r.def.name + '</td><td>' + U.fmt(z(r.V * sg, 1e-6), 'V') + '</td><td>' + U.fmt(z(r.I * sg, 1e-10), 'A') + '</td><td>' + U.fmt(z(r.P, 1e-8), 'W') + '</td></tr>'; }
     h += '</table>';
     el.innerHTML = h;
@@ -234,8 +234,8 @@ Object.assign(app, {
     let h = '';
     for (const [cat, title] of CATEGORIES) {
       h += '<div class="cat"><div class="cat-t">' + title + '</div><div class="items">';
-      for (const [type, d] of Object.entries(DEFS)) if (d.cat === cat) h += '<div class="item" data-type="' + type + '" title="' + d.name + ' ' + d.en + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span><small>' + d.en + '</small></div>';
-      if (cat === 'other') h += '<div class="item" data-type="__wire" title="导线 Wire (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>导线</span><small>Wire</small></div>';
+      for (const [type, d] of Object.entries(DEFS)) if (d.cat === cat) h += '<div class="item" data-type="' + type + '" title="' + d.name + (I18N.isZh() ? ' ' + d.en : '') + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
+      if (cat === 'other') h += '<div class="item" data-type="__wire" title="' + _t('h.wire_item') + ' (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>' + _t('h.wire_item') + '</span>' + (I18N.isZh() ? '<small>Wire</small>' : '') + '</div>';
       h += '</div></div>';
     }
     pal.innerHTML = h;
@@ -400,10 +400,10 @@ Object.assign(app, {
       if (this.compAt(wx, wy, false)) return;
       const tol = Math.max(8, 10 / this.view.s);
       for (const w of this.wires) for (let i = 1; i < w.pts.length - 1; i++) {
-        if (Math.hypot(w.pts[i][0] - wx, w.pts[i][1] - wy) < tol) { w.pts.splice(i, 1); this.sel = { wire: w }; this.changed(); this.refreshProps(); this.toast('已删除顶点'); return; }
+        if (Math.hypot(w.pts[i][0] - wx, w.pts[i][1] - wy) < tol) { w.pts.splice(i, 1); this.sel = { wire: w }; this.changed(); this.refreshProps(); this.toast(_t('ui.vertex_removed')); return; }
       }
       const wh = this.wireHit(wx, wy);
-      if (wh) { const q = this.snapOnWire(wh); wh.w.pts.splice(wh.seg + 1, 0, q); this.sel = { wire: wh.w }; this.changed(); this.refreshProps(); this.toast('已添加顶点，可拖动方形顶点调整折线'); }
+      if (wh) { const q = this.snapOnWire(wh); wh.w.pts.splice(wh.seg + 1, 0, q); this.sel = { wire: wh.w }; this.changed(); this.refreshProps(); this.toast(_t('ui.vertex_added_drag_the_square_handle')); }
     });
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -510,19 +510,19 @@ Object.assign(app, {
   bringToFront(c) { const i = this.comps.indexOf(c); if (i >= 0 && i < this.comps.length - 1) { this.comps.splice(i, 1); this.comps.push(c); } },
 
   // ---------- file ops ----------
-  saveLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.serialize())); this.toast('💾 已保存到浏览器本地存储'); } catch (e) { this.toast('保存失败：' + e.message); } },
-  loadLocal() { const s = localStorage.getItem(SAVE_KEY); if (!s) { this.toast('没有找到已保存的电路'); return; } this.load(s); this.fitView(); this.toast('📂 已载入保存的电路'); },
+  saveLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.serialize())); this.toast(_t('ui.saved_to_browser_storage')); } catch (e) { this.toast(_t('ui.save_failed') + e.message); } },
+  loadLocal() { const s = localStorage.getItem(SAVE_KEY); if (!s) { this.toast(_t('ui.no_saved_circuit_found')); return; } this.load(s); this.fitView(); this.toast(_t('ui.saved_circuit_loaded')); },
   download() {
     const blob = new Blob([JSON.stringify(this.serialize(), null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     const d = new Date(), pad = (n) => String(n).padStart(2, '0');
     a.download = 'circuit-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + '.json';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    this.toast('⬇ 已导出 JSON 文件');
+    this.toast(_t('ui.json_file_exported'));
   },
   upload(file) {
     const r = new FileReader();
-    r.onload = () => { try { this.load(r.result); this.fitView(); this.toast('已导入：' + file.name); } catch (e) { this.toast('导入失败：' + e.message); } };
+    r.onload = () => { try { this.load(r.result); this.fitView(); this.toast(_t('ui.imported') + file.name); } catch (e) { this.toast(_t('ui.import_failed') + e.message); } };
     r.readAsText(file);
   },
 
@@ -530,12 +530,12 @@ Object.assign(app, {
   bindToolbar() {
     const on = (id, f) => { $(id).onclick = f; };
     on('#btn-run', () => this.toggleRun());
-    on('#btn-reset', () => { this.resetSim(); this.toast('仿真已重置'); this.refreshProps(); });
+    on('#btn-reset', () => { this.resetSim(); this.toast(_t('ui.simulation_reset')); this.refreshProps(); });
     on('#btn-undo', () => this.undo());
     on('#btn-redo', () => this.redo());
     on('#btn-rot', () => this.rotateSel());
     on('#btn-del', () => this.deleteSel());
-    on('#btn-clear', () => { if (confirm('确定清空整个电路吗？')) this.clearAll(); });
+    on('#btn-clear', () => { if (confirm(_t('ui.clear_the_whole_circuit'))) this.clearAll(); });
     on('#btn-wire', () => this.setWireMode(!this.wireMode));
     on('#btn-analysis', () => this.toggleAnalysis());
     on('#btn-save', () => this.saveLocal());
@@ -546,8 +546,7 @@ Object.assign(app, {
     on('#btn-zin', () => this.zoomAt(this.W / 2, this.H / 2, 1.2));
     on('#btn-zout', () => this.zoomAt(this.W / 2, this.H / 2, 1 / 1.2));
     $('#file-in').onchange = (e) => { if (e.target.files[0]) this.upload(e.target.files[0]); e.target.value = ''; };
-    const exSel = $('#sel-example');
-    exSel.innerHTML = '<option value="">📘 示例电路…</option>' + EXAMPLES.map(e => '<option value="' + e.id + '">' + e.name + '</option>').join('');
+    this.buildExamples(); const exSel = $('#sel-example');
     exSel.onchange = () => { if (exSel.value) { this.loadExample(exSel.value); this.run(); } exSel.value = ''; };
     $('#sel-speed').onchange = (e) => { this.speed = parseFloat(e.target.value); };
     $('#chk-current').onchange = (e) => { this.showCurrent = e.target.checked; };
@@ -567,7 +566,26 @@ Object.assign(app, {
     });
   },
 
+  buildExamples() {
+    const exSel = $('#sel-example'); if (!exSel) return;
+    exSel.innerHTML = _t('ui.example_circuits') + EXAMPLES.map(e => '<option value="' + e.id + '">' + e.name + '</option>').join('');
+  },
+  // language menu in the toolbar (native names); switching re-renders everything in place, the circuit is untouched
+  buildLangMenu() {
+    const sel = $('#sel-lang'); if (!sel) return;
+    sel.innerHTML = I18N.LANGS.map(([c, n]) => '<option value="' + c + '"' + (c === I18N.lang ? ' selected' : '') + '>' + n + '</option>').join('');
+    sel.onchange = () => this.setLang(sel.value);
+  },
+  setLang(code) {
+    I18N.set(code);
+    const sel = $('#sel-lang'); if (sel) sel.value = I18N.lang;
+    this.buildPalette(); if (this.wireMode) this.setWireMode(true);
+    this.buildExamples(); this.updateRunBtn(); this.refreshProps(); this.updateAnalysis(true);
+    if (this.updateHud) this.updateHud();
+    this.dirty = true;
+  },
   init() {
+    I18N.relocalize(); I18N.applyDom(); this.buildLangMenu();
     this.cv = $('#cv'); this.ctx = this.cv.getContext('2d');
     this.resize();
     window.addEventListener('resize', () => this.resize());

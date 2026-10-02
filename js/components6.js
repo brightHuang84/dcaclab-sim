@@ -83,14 +83,14 @@ function absorbE(c, dt, app, Emax, Pcont, what) {   // surge energy bookkeeping 
   const st = c.state, P = Math.abs((c._m.V || 0) * (c._m.I || 0));
   st.E = Math.max(0, (st.E || 0) + (P - Pcont) * dt); st.Epk = Math.max(st.Epk || 0, st.E);
   st.Ipk = Math.max(st.Ipk || 0, Math.abs(c._m.I || 0)); if (Math.abs(c._m.I || 0) > 0.01) st.Vcl = Math.max(st.Vcl || 0, Math.abs(c._m.V || 0));
-  if (!st.burnt && st.E > Emax) { st.burnt = true; app.dirty = true; app.toast('💥 ' + what + ' 吸收能量 ' + U.fmt(st.E, 'J') + ' 超过额定 ' + U.fmt(Emax, 'J') + '，已击穿短路（通常会使上游保险丝熔断）'); return true; }
+  if (!st.burnt && st.E > Emax) { st.burnt = true; app.dirty = true; app.toast('💥 ' + what + _t('parts.absorbed') + U.fmt(st.E, 'J') + _t('parts.exceeding_the_rating_of') + U.fmt(Emax, 'J') + _t('parts.it_has_failed_short_this_usually_blo')); return true; }
   return false;
 }
 
 const MOV_PARTS = { '07D220K': [22, 8.9, 1.5, 0.02], '10D390K': [39, 10, 4, 0.05], '10D471K': [470, 15, 45, 0.4], '14D471K': [470, 16.7, 100, 0.6], '14D681K': [680, 16.7, 140, 0.6] };   // V1mA, α, Emax (J), P (W)
 const TVS_PARTS = { 'SMBJ5.0A': [6.4, 9.2, 65.2, 0], 'SMBJ12A': [13.3, 19.9, 30.2, 0], 'SMBJ24A': [26.7, 38.9, 15.4, 0], 'SMBJ5.0CA': [6.4, 9.2, 65.2, 1], 'P6KE15CA': [14.3, 21.2, 28, 1] };  // Vbr, Vc, Ipp, bidirectional
 const PPTC_PARTS = { 'MF-R010': [0.1, 0.2, 2.5], 'MF-R050': [0.5, 1.0, 0.18], 'MF-R110': [1.1, 2.2, 0.1], 'MF-R250': [2.5, 5.0, 0.035] };   // Ihold, Itrip, R
-const presetProp = (tbl, def) => ({ k: 'part', label: '型号 Part No.', kind: 'select', opts: Object.keys(tbl).map(k => [k, k]), def });
+const presetProp = (tbl, def) => ({ k: 'part', label: _t('parts.part_no'), kind: 'select', opts: Object.keys(tbl).map(k => [k, k]), def });
 
 Object.assign(DEFS, {
   // ======================= protection =======================
@@ -107,11 +107,11 @@ Object.assign(DEFS, {
       c._d1 = m.addD(n[0], n[1], Is, nVt, sub(st, 'f')); c._d2 = m.addD(n[1], n[0], Is, nVt, sub(st, 'r')); c._p = null;
     },
     measure(c) { c._m.I = c.state.burnt ? c._m.V * 2 : (c._d1.i - c._d2.i); c._m.P = Math.abs(c._m.V * c._m.I); },
-    post(c, dt, app) { if (!c.state.burnt) absorbE(c, dt, app, c.props.Emax, c.props.Pc, '压敏电阻'); },
+    post(c, dt, app) { if (!c.state.burnt) absorbE(c, dt, app, c.props.Emax, c.props.Pc, _t('mov.varistor')); },
     readings(c) {
       const M = c._m, st = c.state, I = Math.abs(M.I || 0);
-      return [['端电压', U.fmt(M.V || 0, 'V')], ['电流', U.fmt(I < 1e-9 ? 0 : M.I, 'A')], ['状态', st.burnt ? '已击穿 (短路失效)' : I > 1e-3 ? '钳位导通 Clamping' : '高阻 (待机)'],
-        ['峰值电流 / 钳位电压', U.fmt(st.Ipk || 0, 'A') + ' / ' + U.fmt(st.Vcl || 0, 'V')], ['吸收能量', U.fmt(st.E || 0, 'J') + ' / ' + U.fmt(c.props.Emax, 'J')]];
+      return [[_t('common.terminal_voltage'), U.fmt(M.V || 0, 'V')], [_t('common.current'), U.fmt(I < 1e-9 ? 0 : M.I, 'A')], [_t('common.state'), st.burnt ? _t('common.failed_short_circuit') : I > 1e-3 ? _t('mov.clamping') : _t('mov.high_impedance_standby')],
+        [_t('common.peak_current_clamp_voltage'), U.fmt(st.Ipk || 0, 'A') + ' / ' + U.fmt(st.Vcl || 0, 'V')], [_t('common.absorbed_energy'), U.fmt(st.E || 0, 'J') + ' / ' + U.fmt(c.props.Emax, 'J')]];
     },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -10, 0); D.lead(ctx, 10, 0, 40, 0);
@@ -138,11 +138,11 @@ Object.assign(DEFS, {
       c._p = null;
     },
     measure(c) { c._m.I = c.state.burnt ? c._m.V * 5 : c._d1.i - (c._d2 ? c._d2.i : 0); c._m.P = Math.abs(c._m.V * c._m.I); },
-    post(c, dt, app) { if (!c.state.burnt) absorbE(c, dt, app, c.props.Emax, 5, 'TVS 二极管'); },
+    post(c, dt, app) { if (!c.state.burnt) absorbE(c, dt, app, c.props.Emax, 5, _t('tvs.tvs_diode')); },
     readings(c) {
       const M = c._m, st = c.state, I = M.I || 0, P = c.props;
-      const mode = st.burnt ? '已击穿 (短路失效)' : Math.abs(I) < 1e-4 ? '截止 (待机)' : (!P.bidir && I > 0) ? '正向导通' : '雪崩钳位 Clamping';
-      return [[P.bidir ? '端电压' : 'K−A 电压', U.fmt(P.bidir ? (M.V || 0) : -(M.V || 0), 'V')], ['电流', U.fmt(Math.abs(I) < 1e-9 ? 0 : I, 'A')], ['状态', mode], ['峰值电流 / 钳位电压', U.fmt(st.Ipk || 0, 'A') + ' / ' + U.fmt(st.Vcl || 0, 'V')], ['吸收能量', U.fmt(st.E || 0, 'J')]];
+      const mode = st.burnt ? _t('common.failed_short_circuit') : Math.abs(I) < 1e-4 ? _t('tvs.off_standby') : (!P.bidir && I > 0) ? _t('tvs.forward_conduction') : _t('tvs.avalanche_clamping');
+      return [[P.bidir ? _t('common.terminal_voltage') : _t('tvs.k_a_voltage'), U.fmt(P.bidir ? (M.V || 0) : -(M.V || 0), 'V')], [_t('common.current'), U.fmt(Math.abs(I) < 1e-9 ? 0 : I, 'A')], [_t('common.state'), mode], [_t('common.peak_current_clamp_voltage'), U.fmt(st.Ipk || 0, 'A') + ' / ' + U.fmt(st.Vcl || 0, 'V')], [_t('common.absorbed_energy'), U.fmt(st.E || 0, 'J')]];
     },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -14, 0); D.lead(ctx, 14, 0, 40, 0);
@@ -169,12 +169,12 @@ Object.assign(DEFS, {
       const st = c.state, k = DEFS.pptc.th(c); st.T = st.T === undefined ? 25 : st.T;
       const P = Math.abs(c._m.P || 0), T1 = st.T + dt * (P - (st.T - 25) / k.Rth) / k.Cth;
       const was = st.T > k.Tsw; st.T = U.clamp(T1, 25, 250); st.g = 1 / DEFS.pptc.R(c);
-      if (!was && st.T > k.Tsw) { st.trips = (st.trips || 0) + 1; app.toast('🔶 自恢复保险丝动作 (过流 → 高阻)，断电冷却后自动恢复'); }
+      if (!was && st.T > k.Tsw) { st.trips = (st.trips || 0) + 1; app.toast(_t('pptc.resettable_fuse_tripped_overcurrent')); }
     },
     readings(c) {
       const st = c.state, T = st.T === undefined ? 25 : st.T, R = DEFS.pptc.R(c), trip = T > DEFS.pptc.th(c).Tsw;
-      return [['电流', U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], ['压降', U.fmt(c._m.V || 0, 'V')], ['电阻', U.fmt(R, 'Ω')], ['温度', T.toFixed(0) + ' °C'],
-        ['状态', trip ? '已动作 Tripped (高阻限流)' : T > 60 ? '发热中…' : '正常 (低阻)'], ['Ihold / Itrip', U.fmt(c.props.Ih, 'A') + ' / ' + U.fmt(c.props.It, 'A')]];
+      return [[_t('common.current'), U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], [_t('pptc.voltage_drop'), U.fmt(c._m.V || 0, 'V')], [_t('common.resistor'), U.fmt(R, 'Ω')], [_t('common.temperature'), T.toFixed(0) + ' °C'],
+        [_t('common.state'), trip ? _t('pptc.tripped_high_resistance_limiting') : T > 60 ? _t('pptc.heating') : _t('pptc.normal_low_resistance')], ['Ihold / Itrip', U.fmt(c.props.Ih, 'A') + ' / ' + U.fmt(c.props.It, 'A')]];
     },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -14, 0); D.lead(ctx, 14, 0, 40, 0);
@@ -199,8 +199,8 @@ Object.assign(DEFS, {
     measure(c, m) { const n = c._nodes; c._m.Vka = m.v(n[2]) - m.v(n[1]); c._m.Vref = m.v(n[0]) - m.v(n[1]); c._m.Ika = (c._q.ika || 0) - c._d.i; c._m.V = c._m.Vka; c._m.I = c._m.Ika; c._m.P = Math.abs(c._m.Vka * c._m.Ika); },
     readings(c) {
       const M = c._m, I = M.Ika || 0;
-      return [['阴极电压 Vka', U.fmt(M.Vka || 0, 'V')], ['阴极电流 Ika', U.fmt(Math.abs(I) < 1e-9 ? 0 : I, 'A')], ['REF−A 电压', U.fmt(M.Vref || 0, 'V')],
-        ['状态', I > 1e-3 ? '稳压 Regulating (Ika ≥ 1 mA)' : I > 1e-5 ? '电流过小 (需 ≥1 mA)' : '截止 Off'], ['公式', 'Vka = Vref·(1 + R1/R2)']];
+      return [[_t('tl431.cathode_voltage_vka'), U.fmt(M.Vka || 0, 'V')], [_t('tl431.cathode_current_ika'), U.fmt(Math.abs(I) < 1e-9 ? 0 : I, 'A')], [_t('tl431.ref_a_voltage'), U.fmt(M.Vref || 0, 'V')],
+        [_t('common.state'), I > 1e-3 ? _t('tl431.regulating_ika_1_ma') : I > 1e-5 ? _t('tl431.current_too_low_needs_1_ma') : _t('tl431.off')], [_t('tl431.formula'), 'Vka = Vref·(1 + R1/R2)']];
     },
     draw(ctx, c) { drawTO92(ctx, c, ['TL431', 'R A K']); },
   },
@@ -223,9 +223,9 @@ Object.assign(DEFS, {
       M.da = m.v(n[2]) - m.v(n[1]); M.db = m.v(n[4]) - m.v(n[5]); M.V = M.Vcc; M.I = M.Vcc / 12.5e3 + M.ia + M.ib; M.P = M.Vcc * M.Vcc / 12.5e3 + M.oa * M.ia + M.ob * M.ib;
     },
     readings(c) {
-      const M = c._m, st = (d, i) => (Math.abs(d) < 2e-3 ? '临界' : d < 0 ? '输出低 (导通灌电流 ' + U.fmt(i, 'A') + ')' : '输出高阻 (需上拉)');
-      return [['VCC', U.fmt(M.Vcc || 0, 'V') + ((M.Vcc || 0) < 2 ? ' (欠压)' : '')], ['A: IN+ − IN−', U.fmt(M.da || 0, 'V')], ['A: 输出', U.fmt(M.oa || 0, 'V') + ' · ' + st(M.da || 0, M.ia || 0)],
-        ['B: IN+ − IN−', U.fmt(M.db || 0, 'V')], ['B: 输出', U.fmt(M.ob || 0, 'V') + ' · ' + st(M.db || 0, M.ib || 0)], ['说明', '集电极开路输出：OUT 需接上拉电阻到 VCC']];
+      const M = c._m, st = (d, i) => (Math.abs(d) < 2e-3 ? _t('lm393.threshold') : d < 0 ? _t('lm393.output_low_sinking') + U.fmt(i, 'A') + ')' : _t('lm393.output_high_z_needs_pull_up'));
+      return [['VCC', U.fmt(M.Vcc || 0, 'V') + ((M.Vcc || 0) < 2 ? _t('lm393.undervoltage') : '')], ['A: IN+ − IN−', U.fmt(M.da || 0, 'V')], [_t('lm393.a_output'), U.fmt(M.oa || 0, 'V') + ' · ' + st(M.da || 0, M.ia || 0)],
+        ['B: IN+ − IN−', U.fmt(M.db || 0, 'V')], [_t('lm393.b_output'), U.fmt(M.ob || 0, 'V') + ' · ' + st(M.db || 0, M.ib || 0)], [_t('common.note'), _t('lm393.open_collector_outputs_out_needs_a_p')]];
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.lm393.terms) D.lead(ctx, x, y, x, Math.sign(y) * 16);
@@ -248,8 +248,8 @@ Object.assign(DEFS, {
     post(c, dt, app) { const ok = (c._m.Vcc || 0) > 2.5; c.state.s = ok ? DEFS.xosc.frac(c.props.f, app.t, app.t + app.dt) : 0; c.state.ok = ok; },
     readings(c) {
       const f = c.props.f, ny = 0.5 / (window.app ? app.dt : 2e-4);
-      return [['频率', U.fmt(f, 'Hz')], ['电源', U.fmt(c._m.Vcc || 0, 'V') + (c.state.ok ? '' : ' (未起振)')], ['输出', U.fmt(c._m.Vo || 0, 'V')],
-        ['说明', f > ny ? '高于仿真带宽 (Δt=' + U.fmt(app.dt, 's') + ')：输出为每步平均电平 ≈ VCC/2' : '方波 50% 占空比']];
+      return [[_t('common.frequency'), U.fmt(f, 'Hz')], [_t('common.supply'), U.fmt(c._m.Vcc || 0, 'V') + (c.state.ok ? '' : _t('xosc.not_oscillating'))], [_t('common.output'), U.fmt(c._m.Vo || 0, 'V')],
+        [_t('common.note'), f > ny ? _t('xosc.above_simulation_bandwidth_t') + U.fmt(app.dt, 's') + _t('xosc.output_is_the_per_step_average_vcc_2') : _t('xosc.square_wave_50_duty')]];
     },
     draw(ctx, c) {
       for (const [x] of DEFS.xosc.terms) D.lead(ctx, x, 30, x, 14);
@@ -268,7 +268,7 @@ Object.assign(DEFS, {
     label: (c) => (c.state.on ? '♪ 2.3 kHz' : ''),
     build(c, n, m) { const x = m.newNode(); c._p = m.addD(n[0], x, 1e-12, 1.5 * VT, c.state); m.addR(x, n[1], c.props.Ir / Math.max(0.3, c.props.Vr - 0.7)); },
     post(c, dt, app) { const on = (c._m.V || 0) > 0.55 * c.props.Vr; c.state.on = on; const want = on && !!c.props.sound && app.running; if (want !== !!c._osc) toneSound(c, want, 2300); },
-    readings(c) { return [['电压', U.fmt(c._m.V || 0, 'V')], ['电流', U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], ['状态', c.state.on ? '鸣响 ♪ (内置振荡 ≈2.3 kHz)' : (c._m.V || 0) < -0.5 ? '反接 — 不响' : '静音'], ['说明', '加直流即响；有极性']]; },
+    readings(c) { return [[_t('common.voltage'), U.fmt(c._m.V || 0, 'V')], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], [_t('common.state'), c.state.on ? _t('abuzzer.sounding_internal_oscillator_2_3_khz') : (c._m.V || 0) < -0.5 ? _t('abuzzer.reversed_silent') : _t('abuzzer.silent')], [_t('common.note'), _t('abuzzer.sounds_with_dc_applied_polarized')]]; },
     draw(ctx, c) { drawBuzzerBody(ctx, c, true); },
   },
   pbuzzer: {
@@ -283,7 +283,7 @@ Object.assign(DEFS, {
       if (st.win >= 0.05) { st.f = (st.zc || 0) / (2 * st.win); st.on = st.f >= 20 && st.amp > 0.005; st.A = st.amp; st.zc = 0; st.win = 0; st.amp = 0; }
       const want = !!st.on && !!c.props.sound && app.running; if (want !== !!c._osc || (want && c._osc && Math.abs(c._osc.frequency.value - st.f) > 5)) toneSound(c, want, st.f);
     },
-    readings(c) { const st = c.state; return [['驱动频率', st.on ? U.fmt(st.f, 'Hz') : '—'], ['电流', U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], ['状态', st.on ? '鸣响 ♪ 音调 = 驱动频率' : '无声 (需方波/PWM 驱动；直流不响)'], ['说明', '电磁式，无内置振荡']]; },
+    readings(c) { const st = c.state; return [[_t('pbuzzer.drive_frequency'), st.on ? U.fmt(st.f, 'Hz') : '—'], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0) < 1e-9 ? 0 : c._m.I, 'A')], [_t('common.state'), st.on ? _t('pbuzzer.sounding_pitch_drive_frequency') : _t('pbuzzer.silent_needs_square_wave_pwm_drive_d')], [_t('common.note'), _t('pbuzzer.electromagnetic_no_internal_oscillat')]]; },
     draw(ctx, c) { drawBuzzerBody(ctx, c, false); },
   },
 
@@ -305,21 +305,21 @@ Object.assign(DEFS, {
     post(c) { DEFS.hall.upd(c); c.state.pw = (c._m.Vcc || 0) > (c.props.part === '49E' ? 2.7 : 3.5); },
     readings(c) {
       const B = MT(c.props.pos), M = c._m, lin = c.props.part === '49E';
-      return [['磁场 B', B.toFixed(0) + ' mT'], ['VCC', U.fmt(M.Vcc || 0, 'V')], ['输出', U.fmt(M.Vo || 0, 'V')],
-        ['状态', lin ? '线性输出 ≈ VCC/2 + 14 mV/mT' : c.state.on ? '检测到磁场 → OUT 拉低 (导通)' : '无磁场 → OUT 高阻 (需上拉)'], ['操作', '单击 = 磁铁靠近/移开；滚轮 = 调节磁场']];
+      return [[_t('hall.magnetic_field_b'), B.toFixed(0) + ' mT'], ['VCC', U.fmt(M.Vcc || 0, 'V')], [_t('common.output'), U.fmt(M.Vo || 0, 'V')],
+        [_t('common.state'), lin ? _t('hall.linear_output_vcc_2_14_mv_mt') : c.state.on ? _t('hall.field_detected_out_pulled_low_on') : _t('hall.no_field_out_high_z_needs_pull_up')], [_t('common.operation'), _t('hall.click_bring_magnet_near_away_wheel_a')]];
     },
     draw(ctx, c) { drawTO92(ctx, c, [c.props.part === '49E' ? '49E' : '3144', 'V G O']); const B = MT(c.props.pos); drawMagnet(ctx, 26, -14, Math.abs(B) / 60); if (c.props.part !== '49E' && c.state.on) { ctx.fillStyle = '#39d353'; ctx.beginPath(); ctx.arc(10, 0, 2.2, 0, 7); ctx.fill(); } },
   },
   reed: {
     name: '干簧管', en: 'Reed Switch', cat: 'sensor', desig: 'S', terms: [[-40, 0], [40, 0]], termNames: ['1', '2'], box: [-40, -26, 40, 12], wheel: true, innerShort: true,
-    props: [{ k: 'pos', label: '磁铁距离 (近 ← → 远)', kind: 'range', def: 0, fmt: (v) => (v > 0.6 ? '很近' : v > 0.4 ? '中等' : '远') }],
-    label: (c) => (DEFS.reed.closed(c) ? '闭合' : '断开'),
+    props: [{ k: 'pos', label: '磁铁距离 (近 ← → 远)', kind: 'range', def: 0, fmt: (v) => (v > 0.6 ? _t('reed.very_near') : v > 0.4 ? _t('reed.medium') : _t('reed.far')) }],
+    label: (c) => (DEFS.reed.closed(c) ? _t('reed.closed') : _t('reed.open')),
     closed(c) { const st = c.state, p = c.props.pos; if (p >= 0.6) st.closed = true; else if (p < 0.4) st.closed = false; return !!st.closed; },   // pull-in / drop-out hysteresis
     click(c, app) { c.props.pos = c.props.pos > 0.5 ? 0 : 0.9; app.dirty = true; app.changed(); if (app.sel && app.sel.comp === c) app.refreshProps(); },
     shorted: (c) => (DEFS.reed.closed(c) ? [[0, 1]] : null),
     build(c, n, m) { if (!DEFS.reed.closed(c)) m.addR(n[0], n[1], G_OFF); c._p = null; },
     measure(c) { c._m.V = 0; c._m.P = 0; },
-    readings(c) { return [['触点', DEFS.reed.closed(c) ? '闭合 (磁铁吸合)' : '断开'], ['磁铁', c.props.pos > 0.6 ? '靠近' : c.props.pos > 0.4 ? '中等距离 (保持)' : '远离'], ['电流', U.fmt(Math.abs(c._m.I || 0), 'A')], ['操作', '单击 = 磁铁靠近/移开']]; },
+    readings(c) { return [[_t('common.contacts'), DEFS.reed.closed(c) ? _t('reed.closed_magnet_attracts') : _t('reed.open')], [_t('reed.magnet'), c.props.pos > 0.6 ? _t('reed.near') : c.props.pos > 0.4 ? _t('reed.medium_distance_holds') : _t('reed.far_away')], [_t('common.current'), U.fmt(Math.abs(c._m.I || 0), 'A')], [_t('common.operation'), _t('reed.click_bring_magnet_near_away')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -26, 0); D.lead(ctx, 26, 0, 40, 0);
       ctx.fillStyle = 'rgba(200,230,255,0.45)'; D.rrect(ctx, -26, -6, 52, 12, 6); ctx.fill(); ctx.strokeStyle = 'rgba(120,150,180,0.8)'; ctx.lineWidth = 0.8; ctx.stroke();
@@ -333,7 +333,7 @@ Object.assign(DEFS, {
     label: (c) => Math.round(1000 * c.props.pos) + ' lx',
     build(c, n, m) { c._q = m.addNL('photoq', [n[0], n[1]], { Vs: 0.12, Idark: 1e-7, ILf: () => c.props.S * U.clamp(c.props.pos, 0, 1.5) }, c.state); c._p = null; },
     measure(c) { const IL = c.props.S * c.props.pos + 1e-7, s = optoSat(c._m.V || 0, 0.12)[0]; c._m.I = IL * s; c._m.P = Math.abs(c._m.V * c._m.I); },
-    readings(c) { const M = c._m; return [['光照', Math.round(1000 * c.props.pos) + ' lx'], ['集电极电流', U.fmt(M.I || 0, 'A')], ['Vce', U.fmt(M.V || 0, 'V')], ['状态', c.props.pos < 0.01 ? '暗 (暗电流)' : (M.V || 0) < 0.3 ? '饱和导通' : '线性 (Ic ∝ 光照)']]; },
+    readings(c) { const M = c._m; return [[_t('common.light'), Math.round(1000 * c.props.pos) + ' lx'], [_t('phototr.collector_current'), U.fmt(M.I || 0, 'A')], ['Vce', U.fmt(M.V || 0, 'V')], [_t('common.state'), c.props.pos < 0.01 ? _t('phototr.dark_dark_current') : (M.V || 0) < 0.3 ? _t('common.saturated_on') : _t('phototr.linear_ic_light')]]; },
     draw(ctx, c) {
       D.lead(ctx, -40, 0, -12, 0); D.lead(ctx, 12, 0, 40, 0); glow(ctx, 0, 0, 22, '#ffe46a', c.props.pos * 0.45);
       ctx.fillStyle = 'rgba(30,30,40,0.9)'; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(-3, -4, 4, 0, 7); ctx.fill();
@@ -378,7 +378,7 @@ Object.assign(DEFS, {
     name: '继电器模块 (1 路)', en: 'Relay Module 1-ch', cat: 'drive', desig: 'K',
     terms: [[-80, -20], [-80, 0], [-80, 20], [80, -20], [80, 0], [80, 20]], termNames: ['VCC', 'GND', 'IN 信号', 'NO 常开', 'COM 公共端', 'NC 常闭'], box: [-80, -40, 80, 40], innerShort: true,
     props: [{ k: 'trig', label: '触发方式', kind: 'select', opts: [['low', '低电平触发'], ['high', '高电平触发']], def: 'high' }, { k: 'Vcoil', label: '线圈电压', kind: 'select', num: true, opts: [[5, '5 V'], [12, '12 V']], def: 5 }],
-    label: (c) => (c.state.on ? '吸合' : '释放'),
+    label: (c) => (c.state.on ? _t('relaymod.energized') : _t('relaymod.released')),
     shorted: (c) => (c.state.on ? [[4, 3]] : [[4, 5]]),
     build(c, n, m) {
       const st = c.state, x = m.newNode(), Rc = c.props.Vcoil === 12 ? 400 : 70;
@@ -398,8 +398,8 @@ Object.assign(DEFS, {
     },
     readings(c) {
       const M = c._m, st = c.state;
-      return [['触点', st.on ? 'COM–NO 吸合' : 'COM–NC 释放'], ['VCC', U.fmt(M.Vcc || 0, 'V')], ['IN 电流', U.fmt(Math.abs(M.Iin || 0) < 1e-9 ? 0 : M.Iin, 'A')], ['线圈电流', U.fmt(M.Ic || 0, 'A')],
-        ['触发', c.props.trig === 'low' ? '低电平触发 (IN 接 GND 吸合)' : '高电平触发 (IN 接 VCC 吸合)'], ['动作', '吸合 ~8 ms，释放 ~4 ms']];
+      return [[_t('common.contacts'), st.on ? _t('relaymod.com_no_energized') : _t('relaymod.com_nc_released')], ['VCC', U.fmt(M.Vcc || 0, 'V')], [_t('relaymod.in_current'), U.fmt(Math.abs(M.Iin || 0) < 1e-9 ? 0 : M.Iin, 'A')], [_t('common.coil_current'), U.fmt(M.Ic || 0, 'A')],
+        [_t('relaymod.trigger'), c.props.trig === 'low' ? _t('relaymod.low_level_trigger_in_to_gnd_energize') : _t('relaymod.high_level_trigger_in_to_vcc_energiz')], [_t('relaymod.timing'), _t('relaymod.pull_in_8_ms_release_4_ms')]];
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.relaymod.terms) D.lead(ctx, x, y, Math.sign(x) * 70, y);
@@ -416,13 +416,13 @@ Object.assign(DEFS, {
   keypad: {
     name: '4×4 矩阵键盘', en: 'Membrane Keypad 4×4', cat: 'control', desig: 'SW', momentary: true, innerShort: true,
     terms: Array.from({ length: 8 }, (_, i) => [-70 + 20 * i, 100]), termNames: ['R1 行1', 'R2 行2', 'R3 行3', 'R4 行4', 'C1 列1', 'C2 列2', 'C3 列3', 'C4 列4'], box: [-80, -84, 80, 100],
-    props: [], label: (c) => (c.state.pressed && c.state.key !== undefined ? '按下 ' + KEYS[c.state.key] : ''),
+    props: [], label: (c) => (c.state.pressed && c.state.key !== undefined ? _t('keypad.pressed') + KEYS[c.state.key] : ''),
     keyAt(lx, ly) { const col = Math.floor((lx + 72) / 36), row = Math.floor((ly + 78) / 36); return col >= 0 && col < 4 && row >= 0 && row < 4 ? row * 4 + col : -1; },
     pressHit(c, lx, ly) { const k = DEFS.keypad.keyAt(lx, ly); if (k < 0) return false; c.state.key = k; return true; },
     shorted: (c) => (c.state.pressed && c.state.key >= 0 ? [[Math.floor(c.state.key / 4), 4 + (c.state.key % 4)]] : null),
     build(c) { c._p = null; },
     measure(c) { c._m.V = 0; c._m.I = 0; c._m.P = 0; },
-    readings(c) { const st = c.state, k = st.pressed && st.key >= 0 ? st.key : -1; return [['按键', k >= 0 ? KEYS[k] : '无'], ['接通', k >= 0 ? 'R' + (Math.floor(k / 4) + 1) + ' – C' + (k % 4 + 1) : '—'], ['说明', '按住按键 = 对应行线与列线接通（矩阵扫描）']]; },
+    readings(c) { const st = c.state, k = st.pressed && st.key >= 0 ? st.key : -1; return [[_t('keypad.key'), k >= 0 ? KEYS[k] : _t('keypad.none')], [_t('keypad.connected'), k >= 0 ? 'R' + (Math.floor(k / 4) + 1) + ' – C' + (k % 4 + 1) : '—'], [_t('common.note'), _t('keypad.holding_a_key_connects_its_row_and_c')]]; },
     draw(ctx, c) {
       for (const [x, y] of DEFS.keypad.terms) D.lead(ctx, x, y, x, 90);
       ctx.fillStyle = '#111'; ctx.fillRect(-76, 82, 152, 10); ctx.fillStyle = '#d9d9d9'; ctx.fillRect(-40, 60, 80, 24);
@@ -454,15 +454,15 @@ Object.assign(DEFS, {
     post(c, dt, app) {
       const st = c.state, M = c._m; if (st.burnt) return;
       st.blf = (st.blf || 0) + (Math.max(0, M.Ibl || 0) - (st.blf || 0)) * Math.min(1, dt / 0.02);
-      if ((M.Vdd || 0) > 7) { st.burnt = true; app.dirty = true; app.toast('💥 LCD1602 电源电压过高 (>7 V) 已损坏'); }
+      if ((M.Vdd || 0) > 7) { st.burnt = true; app.dirty = true; app.toast(_t('lcd1602.lcd1602_damaged_by_excessive_supply')); }
       st.init = (M.Vdd || 0) >= 4.5 ? true : (M.Vdd || 0) < 2.7 ? false : !!st.init;
     },
     text(c, i) { const M = c._m; return String(c.props['line' + i] || '').replace('{V}', U.fmt(M.Vdd || 0, 'V', 3)).replace('{t}', (window.app ? app.t : 0).toFixed(2) + 's').slice(0, 16).padEnd(16, ' '); },
     contrast(c) { return U.clamp(((c._m.Vlcd || 0) - 3.0) / 1.2, 0, 1); },
     readings(c) {
       const M = c._m, st = c.state, ct = DEFS.lcd1602.contrast(c);
-      return [['VDD', U.fmt(M.Vdd || 0, 'V') + (st.init ? '' : ' (未上电/欠压)')], ['对比度 VDD−V0', U.fmt(M.Vlcd || 0, 'V') + (ct <= 0 ? ' (太淡)' : (M.Vlcd || 0) > 4.7 ? ' (太深, 方块)' : ' (正常)')],
-        ['背光电流', U.fmt(Math.max(0, M.Ibl || 0), 'A')], ['显示', st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—'], ['说明', '字符内容由属性设置 (模拟已由单片机初始化)；V0 接 10k 电位器或经电阻接地']];
+      return [['VDD', U.fmt(M.Vdd || 0, 'V') + (st.init ? '' : _t('lcd1602.unpowered_undervoltage'))], [_t('lcd1602.contrast_vdd_v0'), U.fmt(M.Vlcd || 0, 'V') + (ct <= 0 ? _t('lcd1602.too_faint') : (M.Vlcd || 0) > 4.7 ? _t('lcd1602.too_dark_blocks') : _t('lcd1602.normal'))],
+        [_t('lcd1602.backlight_current'), U.fmt(Math.max(0, M.Ibl || 0), 'A')], [_t('common.display'), st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—'], [_t('common.note'), _t('lcd1602.text_is_set_by_the_properties_as_if')]];
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.lcd1602.terms) D.lead(ctx, x, y, x, -48);
@@ -520,15 +520,15 @@ Object.assign(DEFS, {
     },
     post(c) { const n = c._nodes, net = window.app && app.net; if (!net) return; const g = net.v(n[5]); DEFS.l298n.logic(c, (i) => net.v(n[i]) - g); },
     chan(c, k) {
-      const st = c.state; if (!st.ok) return '未供电 (+5V 逻辑电源不足)';
-      if (!(st.en || [])[k]) return '停止 (EN 低 → 滑行)';
+      const st = c.state; if (!st.ok) return _t('l298n.unpowered_5v_logic_supply_too_low');
+      if (!(st.en || [])[k]) return _t('l298n.stopped_en_low_coasting');
       const a = st.ins[2 * k], b = st.ins[2 * k + 1];
-      return a === b ? '制动 Brake (IN' + (2 * k + 1) + '=IN' + (2 * k + 2) + ')' : a ? '正转 Forward' : '反转 Reverse';
+      return a === b ? _t('l298n.brake_in') + (2 * k + 1) + '=IN' + (2 * k + 2) + ')' : a ? _t('l298n.forward') : _t('l298n.reverse');
     },
     readings(c) {
       const M = c._m;
-      return [['电源 VS / +5V', U.fmt(M.Vs || 0, 'V') + ' / ' + U.fmt(M.V5 || 0, 'V')], ['电机 A', DEFS.l298n.chan(c, 0)], ['A: OUT1−OUT2 / 电流', U.fmt(M.Va || 0, 'V') + ' / ' + U.fmt(M.Ia || 0, 'A')],
-        ['电机 B', DEFS.l298n.chan(c, 1)], ['B: OUT3−OUT4 / 电流', U.fmt(M.Vb || 0, 'V') + ' / ' + U.fmt(M.Ib || 0, 'A')], ['芯片损耗', U.fmt(M.P || 0, 'W') + ' (饱和压降约 2 V @1 A)']];
+      return [[_t('l298n.supply_vs_5v'), U.fmt(M.Vs || 0, 'V') + ' / ' + U.fmt(M.V5 || 0, 'V')], [_t('l298n.motor_a'), DEFS.l298n.chan(c, 0)], [_t('l298n.a_out1_out2_current'), U.fmt(M.Va || 0, 'V') + ' / ' + U.fmt(M.Ia || 0, 'A')],
+        [_t('l298n.motor_b'), DEFS.l298n.chan(c, 1)], [_t('l298n.b_out3_out4_current'), U.fmt(M.Vb || 0, 'V') + ' / ' + U.fmt(M.Ib || 0, 'A')], [_t('l298n.chip_dissipation'), U.fmt(M.P || 0, 'W') + _t('l298n.saturation_drop_about_2_v_1_a')]];
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.l298n.terms) { if (y === 100) D.lead(ctx, x, y, x, 80); else D.lead(ctx, x, y, Math.sign(x) * 100, y); }

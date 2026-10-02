@@ -5,7 +5,7 @@ const check = (name, cond, info) => { results[name] = { pass: !!cond, info }; if
 const near = (v, x, tol) => Math.abs(v - x) <= tol;
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -101,7 +101,7 @@ const near = (v, x, tol) => Math.abs(v - x) <= tol;
   check('solar_voc_isc_light', near(pw.sVoc.V, 6, 0.15) && near(pw.sIsc.I, 0.2, 0.005) && near(pw.sHalf.I, 0.1, 0.003) && Math.abs(pw.sDark.V) < 0.01 && pw.sMpp.V * pw.sMpp.I > 0.6, pw);
   check('psu_cv_mode', near(pw.cv.V, 12, 0.01) && near(pw.cv.I, 0.12, 0.001) && /CV/.test(pw.cv.mode), pw.cv);
   check('psu_cc_mode', near(pw.cc.I, 1, 0.02) && near(pw.cc.V, 5, 0.1) && /CC/.test(pw.cc.mode) && near(pw.ccS.I, 0.5, 0.01) && pw.cc.bad === 0, [pw.cc, pw.ccS]);
-  check('psu_output_off', Math.abs(pw.off.V) < 1e-3 && /OFF/.test(pw.off.mode), pw.off);
+  check('psu_output_off', Math.abs(pw.off.V) < 1e-3 && /OFF|关闭/.test(pw.off.mode), pw.off);
   check('buck_4AA_to_3.3V', near(pw.b33.Vout, 3.3, 0.01) && pw.b33.bad === 0 && /正常/.test(pw.b33.st), pw.b33);
   check('buck_efficiency_Pin_eq_Pout_over_eta', near(pw.b33.Pin, pw.b33.Pout / 0.88, 0.01 * pw.b33.Pin) && near(pw.b80.Pin, pw.b80.Pout / 0.8, 0.01 * pw.b80.Pin), [pw.b33, pw.b80]);
   check('buck_input_current_below_output', pw.b33.Iin < pw.b33.Iout && pw.b33.Iin > 0, pw.b33);

@@ -3,7 +3,7 @@ const { chromium } = require('playwright-core');
 const OUT = process.env.OUT || '/workspace/dcaclab-sim/screenshots/';
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 860 }, locale: 'zh-CN', deviceScaleFactor: 1 });
   page.on('pageerror', e => console.log('pageerror', e.message));
   await page.goto('http://127.0.0.1:8765/index.html?fresh=1');
   await page.waitForTimeout(400);
