@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>电路实验室 · Circuit Lab — 在线电路仿真</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="toolbar">
+    <div class="logo"><span class="bolt">⚡</span> 电路实验室 <small>Circuit Lab</small></div>
+    <div class="grp">
+      <button id="btn-run" class="run-btn" title="运行/暂停 (空格)"><span class="ic">▶</span> 运行</button>
+      <button id="btn-reset" title="重置仿真时间与状态">⟲ 重置</button>
+    </div>
+    <div class="grp">
+      <button id="btn-undo" title="撤销 Ctrl+Z">↶</button>
+      <button id="btn-redo" title="重做 Ctrl+Y">↷</button>
+      <button id="btn-wire" title="导线模式 (W)">✎ 导线</button>
+      <button id="btn-rot" title="旋转 (R)">⟳ 旋转</button>
+      <button id="btn-del" title="删除 (Del)">🗑 删除</button>
+      <button id="btn-clear" title="清空电路">🧹 清空</button>
+      <button id="btn-analysis" title="节点电压 / 支路电流表 (KCL)">∑ 分析</button>
+    </div>
+    <div class="grp">
+      <select id="sel-example" title="示例电路"></select>
+    </div>
+    <div class="grp">
+      <button id="btn-save" title="保存到浏览器 (Ctrl+S)">💾 保存</button>
+      <button id="btn-load" title="从浏览器载入">📂 载入</button>
+      <button id="btn-export" title="导出 JSON 文件">⬇ 导出</button>
+      <button id="btn-import" title="导入 JSON 文件">⬆ 导入</button>
+      <input type="file" id="file-in" accept=".json,application/json" hidden>
+    </div>
+    <div class="grp">
+      <label class="lbl">速度
+        <select id="sel-speed">
+          <option value="0.01">0.01×</option><option value="0.1">0.1×</option>
+          <option value="0.5">0.5×</option><option value="1" selected>1× 实时</option>
+          <option value="2">2×</option><option value="5">5×</option>
+        </select></label>
+      <label class="lbl"><input type="checkbox" id="chk-current" checked> 电流动画</label>
+    </div>
+  </header>
+  <aside id="palette">
+    <div class="side-t">元件库 <small>Components</small></div>
+    <div id="palette-body"></div>
+  </aside>
+  <main id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hud"></div>
+    <div id="toast"></div>
+    <div id="zoombox"><button id="btn-zin" title="放大">＋</button><button id="btn-fit" title="适配视图">⤢</button><button id="btn-zout" title="缩小">－</button></div>
+    <div id="tooltip"></div>
+    <div id="analysis"></div>
+  </main>
+  <aside id="props">
+    <div id="props-body"></div>
+  </aside>
+  <footer id="status">
+    <span>提示：从端子拖动连线 · 单击开关切换 · 滚轮缩放 · 拖动空白处平移</span>
+    <span id="status-stats"></span>
+  </footer>
+</div>
+<script src="js/util.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/components.js"></script>
+<script src="js/components2.js"></script>
+<script src="js/components3.js"></script>
+<script src="js/components4.js"></script>
+<script src="js/components5.js"></script>
+<script src="js/components6.js"></script>
+<script src="js/examples.js"></script>
+<script src="js/app.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/meters.js"></script>
+</body>
+</html>

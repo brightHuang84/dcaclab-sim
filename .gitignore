@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Test runners write scratch screenshots and logs outside the committed set.
+dcaclab-sim-test/
+test-results/
+playwright-report/
+*.log
