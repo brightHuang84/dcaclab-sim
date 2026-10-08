@@ -61,6 +61,8 @@ Object.assign(app, {
     el.querySelectorAll('.sw').forEach(b => b.onclick = () => { c.props[b.dataset.k] = b.dataset.v; this.dirty = true; this.changed(); this.refreshProps(); });
     const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = f; };
     on('p-toggle', () => { DEFS.switch.click(c, this); this.refreshProps(); });
+    el.querySelectorAll('.mcu-edit').forEach(b => b.onclick = () => MCU.openEditor(c));
+    el.querySelectorAll('.mcu-ser').forEach(b => b.onclick = () => MCU.openEditor(c, true));
     on('p-fix', () => { c.state = {}; this.dirty = true; this.refreshProps(); this.toast(_t('ui.replaced')); });
     on('p-discharge', () => { c.state.v = 0; c.state.i = 0; this.dirty = true; this.toast(_t('ui.capacitor_discharged')); });
     on('p-rot', () => this.rotateSel());
@@ -74,6 +76,7 @@ Object.assign(app, {
     else if (p.kind === 'select') return '<div class="field"><label>' + p.label + '</label><select data-k="' + p.k + '">' + p.opts.map(([val, lab]) => '<option value="' + val + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + lab + '</option>').join('') + '</select></div>';
     else if (p.kind === 'bool') return '<div class="field"><label class="chk"><input type="checkbox" data-k="' + p.k + '"' + (v ? ' checked' : '') + '> ' + p.label + '</label></div>';
     else if (p.kind === 'color') return '<div class="field"><label>' + p.label + '</label><div class="swatches">' + Object.entries(p.opts).map(([k, o]) => '<button class="sw' + (k === v ? ' on' : '') + '" title="' + o.name + '" data-k="' + p.k + '" data-v="' + k + '" style="background:' + o.hex + '"></button>').join('') + '</div></div>';
+    else if (p.kind === 'code') return '<div class="field"><label>' + p.label + ' <span class="rv">' + _t('mcu.lines_n', { n: String(v || '').split('\n').length }) + '</span></label><div class="mcu-btns"><button class="mcu-edit primary">✎ ' + _t('mcu.edit_program') + '</button><button class="mcu-ser">⌨ ' + _t('mcu.serial_monitor') + '</button></div></div>';
     else if (p.kind === 'text') return '<div class="field"><label>' + p.label + '</label><input type="text" class="tprop" maxlength="40" data-k="' + p.k + '" value="' + String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"></div>';
     else return '<div class="field"><label>' + p.label + '</label><div class="numrow"><input type="text" data-k="' + p.k + '" value="' + (v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '')) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
   },
@@ -115,7 +118,7 @@ Object.assign(app, {
       } else if (c.type === 'ic555') {
         h += _t('ui.output_out') + (c.state.q ? _t('ui.high') : _t('ui.low')) + _t('ui.output_voltage') + U.fmt(m.V, 'V') + _t('ui.measured_frequency') + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
       } else if (DEFS[c.type].readings) {
-        for (const [k, v] of DEFS[c.type].readings(c)) h += '<div>' + k + '<b>' + v + '</b></div>';
+        for (const [k, v] of DEFS[c.type].readings(c)) h += '<div><span class="rk">' + k + '</span><b>' + v + '</b></div>';
       } else if (c.type === 'scope') {
         h += '<div>CH1<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div><div>CH2<b>' + U.fmt(z(m.V2, 1e-6), 'V') + _t('ui.frequency_ch1') + (c.state.freq ? U.fmt(c.state.freq, 'Hz') : '—') + '</b></div>';
         if (c.props.mode === 'fft') { const F = scopeFFT(c); if (F) h += _t('ui.fft_peak_ch1') + U.fmt(F.p1.f, 'Hz', 4) + ' / ' + U.fmt(F.p1.a, 'V', 3) + _t('ui.fft_resolution') + U.fmt(F.f1.df, 'Hz', 3) + '</b></div>'; }
@@ -431,7 +434,8 @@ Object.assign(app, {
     cv.addEventListener('pointerleave', () => { this.hover = null; if (!this.drag) { this.hoverPt = null; this.hoverStrip = null; } });
     cv.addEventListener('dblclick', (e) => {
       const [sx, sy] = pos(e), [wx, wy] = this.toWorld(sx, sy);
-      if (this.compAt(wx, wy, false)) return;
+      const hitC = this.compAt(wx, wy, false);
+      if (hitC) { if (DEFS[hitC.c.type].mcu) MCU.openEditor(hitC.c); return; }
       const tol = Math.max(8, 10 / this.view.s);
       for (const w of this.wires) for (let i = 1; i < w.pts.length - 1; i++) {
         if (Math.hypot(w.pts[i][0] - wx, w.pts[i][1] - wy) < tol) { w.pts.splice(i, 1); this.sel = { wire: w }; this.changed(); this.refreshProps(); this.toast(_t('ui.vertex_removed')); return; }
@@ -625,7 +629,8 @@ Object.assign(app, {
 
   buildExamples() {
     const exSel = $('#sel-example'); if (!exSel) return;
-    exSel.innerHTML = _t('ui.example_circuits') + EXAMPLES.map(e => '<option value="' + e.id + '">' + e.name + '</option>').join('');
+    const tip = (e) => { const d = I18N.t('exd.' + e.id, null, ''); return d && d !== 'exd.' + e.id ? ' title="' + d.replace(/"/g, '&quot;') + '"' : ''; };
+    exSel.innerHTML = _t('ui.example_circuits') + EXAMPLES.map(e => '<option value="' + e.id + '"' + tip(e) + '>' + e.name + '</option>').join('');
   },
   // language menu in the toolbar (native names); switching re-renders everything in place, the circuit is untouched
   buildLangMenu() {
@@ -640,6 +645,7 @@ Object.assign(app, {
     this.buildExamples(); this.updateRunBtn(); this.refreshProps(); this.updateAnalysis(true);
     if (this.updateHud) this.updateHud();
     if (this._dlg === 'export') this.openExportDialog(); else if (this._dlg) this.closeDialog();
+    if (typeof MCU !== 'undefined') MCU.relang();
     this.dirty = true;
   },
   init() {

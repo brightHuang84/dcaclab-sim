@@ -763,7 +763,8 @@ Object.assign(DEFS, {
       const st = c.state, M = c._m, t = app.t, v = M.Vs, v0 = st.vprev === undefined ? v : st.vprev;
       st.vhi = Math.max(v, (st.vhi || 0) * (1 - dt / 0.5)); const TH = Math.max(0.8, 0.5 * st.vhi);   // mid-level threshold (3.3 V or 5 V logic)
       if (st.ang === undefined) st.ang = 90;
-      const cross = () => t - dt * (v - TH) / ((v - v0) || 1e-12);
+      const eAt = app._edgeAt && app._edgeAt.get(c._nodes[2]);   // v10: exact edge time of a microcontroller pin
+      const cross = () => (eAt !== undefined && eAt > t - dt - 1e-12 && eAt <= t + 1e-12 ? eAt : t - dt * (v - TH) / ((v - v0) || 1e-12));
       if (v0 < TH && v >= TH) { const tr = cross(); if (st.tr !== undefined) st.T = tr - st.tr; st.tr = tr; }
       if (v0 >= TH && v < TH && st.tr !== undefined) { const pw = cross() - st.tr; if (pw > 0.3e-3 && pw < 3e-3) { st.pw = pw; st.tp = t; } }
       st.vprev = v;

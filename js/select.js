@@ -407,7 +407,7 @@ Object.assign(app, {
     // bulk edit when every selected part has the same type
     if (types.size === 1 && comps.length > 1) {
       const d = DEFS[comps[0].type], c = comps[0];
-      const fields = d.props.filter(p => p.kind !== 'text').map(p => this.propFieldHtml(p, c.props[p.k])).join('');
+      const fields = d.props.filter(p => p.kind !== 'text' && p.kind !== 'code').map(p => this.propFieldHtml(p, c.props[p.k])).join('');
       if (fields) h += '<div class="help bulk"><div class="rt">' + _t('sel.bulk', { n: comps.length, name: d.name }) + '</div>' + fields + '</div>';
     }
     h += '<div class="hint">' + _t('sel.hint') + '</div>';
