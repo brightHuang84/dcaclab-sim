@@ -10,11 +10,11 @@ Object.assign(app, {
     if (s.wire) {
       const w = s.wire;
       el.innerHTML = _t('ui.wire') + w.pts.length + _t('ui.vertices') +
-        _t('ui.color') + WIRE_COLORS.map(c => '<button class="sw' + (c === w.color ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '</div></div>' +
+        this.wireColorHtml([w]) +
         _t('ui.reset_to_right_angle_delete') +
         _t('ui.drag_a_segment_to_move_it_drag_the_s') +
         '<div id="readings" class="readings"></div>';
-      el.querySelectorAll('.sw').forEach(b => b.onclick = () => { w.color = b.dataset.c; this.wireColor = w.color; this.changed(); this.refreshProps(); });
+      this.bindWireColor(el, [w]);
       $('#p-bend').onclick = () => { this.rotateSel(); this.refreshProps(); };
       $('#p-del').onclick = () => this.deleteSel();
       this.updateReadings(true); return;
@@ -63,6 +63,7 @@ Object.assign(app, {
     on('p-toggle', () => { DEFS.switch.click(c, this); this.refreshProps(); });
     el.querySelectorAll('.mcu-edit').forEach(b => b.onclick = () => MCU.openEditor(c));
     el.querySelectorAll('.mcu-ser').forEach(b => b.onclick = () => MCU.openEditor(c, true));
+    el.querySelectorAll('.mcu-pin').forEach(b => b.onclick = () => { if (typeof MCUHELP !== 'undefined' && MCUHELP) MCUHELP.open(c.type); });
     on('p-fix', () => { c.state = {}; this.dirty = true; this.refreshProps(); this.toast(_t('ui.replaced')); });
     on('p-discharge', () => { c.state.v = 0; c.state.i = 0; this.dirty = true; this.toast(_t('ui.capacitor_discharged')); });
     on('p-rot', () => this.rotateSel());
@@ -76,7 +77,7 @@ Object.assign(app, {
     else if (p.kind === 'select') return '<div class="field"><label>' + p.label + '</label><select data-k="' + p.k + '">' + p.opts.map(([val, lab]) => '<option value="' + val + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + lab + '</option>').join('') + '</select></div>';
     else if (p.kind === 'bool') return '<div class="field"><label class="chk"><input type="checkbox" data-k="' + p.k + '"' + (v ? ' checked' : '') + '> ' + p.label + '</label></div>';
     else if (p.kind === 'color') return '<div class="field"><label>' + p.label + '</label><div class="swatches">' + Object.entries(p.opts).map(([k, o]) => '<button class="sw' + (k === v ? ' on' : '') + '" title="' + o.name + '" data-k="' + p.k + '" data-v="' + k + '" style="background:' + o.hex + '"></button>').join('') + '</div></div>';
-    else if (p.kind === 'code') return '<div class="field"><label>' + p.label + ' <span class="rv">' + _t('mcu.lines_n', { n: String(v || '').split('\n').length }) + '</span></label><div class="mcu-btns"><button class="mcu-edit primary">✎ ' + _t('mcu.edit_program') + '</button><button class="mcu-ser">⌨ ' + _t('mcu.serial_monitor') + '</button></div></div>';
+    else if (p.kind === 'code') return '<div class="field"><label>' + p.label + ' <span class="rv">' + _t('mcu.lines_n', { n: String(v || '').split('\n').length }) + '</span></label><div class="mcu-btns"><button class="mcu-edit primary">✎ ' + _t('mcu.edit_program') + '</button><button class="mcu-ser">⌨ ' + _t('mcu.serial_monitor') + '</button><button class="mcu-pin" title="' + _t('help.title') + '">📌 ' + _t('help.btn') + '</button></div></div>';
     else if (p.kind === 'text') return '<div class="field"><label>' + p.label + '</label><input type="text" class="tprop" maxlength="40" data-k="' + p.k + '" value="' + String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"></div>';
     else return '<div class="field"><label>' + p.label + '</label><div class="numrow"><input type="text" data-k="' + p.k + '" value="' + (v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '')) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
   },
@@ -646,6 +647,7 @@ Object.assign(app, {
     if (this.updateHud) this.updateHud();
     if (this._dlg === 'export') this.openExportDialog(); else if (this._dlg) this.closeDialog();
     if (typeof MCU !== 'undefined') MCU.relang();
+    if (typeof MCUHELP !== 'undefined' && MCUHELP) MCUHELP.relang();
     this.dirty = true;
   },
   init() {
