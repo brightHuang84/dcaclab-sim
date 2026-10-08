@@ -268,11 +268,11 @@ Object.assign(app, {
       for (const [k, l] of ends) {
         if (l.length !== 2 || blocked.has(k) || l[0].w === l[1].w || used.has(l[0].w) || used.has(l[1].w)) continue;
         const [a, b] = l;
+        if (!sameWireColor(a.w.color, b.w.color)) continue;                  // v10.1: differently coloured wires stay separate
         const len = (w) => w.pts.reduce((s, p, i) => (i ? s + Math.abs(p[0] - w.pts[i - 1][0]) + Math.abs(p[1] - w.pts[i - 1][1]) : 0), 0);
         const A = a.e === 2 ? a.w.pts : a.w.pts.slice().reverse();          // ...→ junction
         const B = b.e === 1 ? b.w.pts : b.w.pts.slice().reverse();          // junction → ...
         const keep = a.w, gone = b.w;
-        keep.color = len(b.w) > len(a.w) ? b.w.color : a.w.color;
         keep.pts = A.map(p => p.slice()).concat(B.slice(1).map(p => p.slice())); delete keep.bend;
         this.normalizeWire(keep);
         this.wires = this.wires.filter(w => w !== gone);
@@ -410,11 +410,13 @@ Object.assign(app, {
       const fields = d.props.filter(p => p.kind !== 'text' && p.kind !== 'code').map(p => this.propFieldHtml(p, c.props[p.k])).join('');
       if (fields) h += '<div class="help bulk"><div class="rt">' + _t('sel.bulk', { n: comps.length, name: d.name }) + '</div>' + fields + '</div>';
     }
+    if (wires.length) h += this.wireColorHtml(wires);
     h += '<div class="hint">' + _t('sel.hint') + '</div>';
     return h;
   },
   bindGroupProps(el) {
     const { comps } = this.selItems();
+    if (this.selItems().wires.length) this.bindWireColor(el, this.selItems().wires);
     const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = f; };
     on('g-rot', () => this.rotateGroup());
     on('g-dup', () => this.duplicateGroup());

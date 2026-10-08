@@ -160,3 +160,60 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .mcu-win .mw-in { display: flex; gap: 6px; padding: 6px 8px; background: #f4f7fa; }
 .mcu-win .mw-in input { flex: 1; font: 12px Consolas, monospace; padding: 4px 6px; border: 1px solid #c5d0dc; border-radius: 5px; }
 .mcu-win .mw-grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #9fb0c4 50%, #9fb0c4 60%, transparent 60%, transparent 70%, #9fb0c4 70%, #9fb0c4 80%, transparent 80%); }
+/* v10.1 wire colours: custom colour picker swatch */
+.sw-custom { position: relative; overflow: hidden; display: inline-block; box-sizing: border-box; background: conic-gradient(#e33, #eb3, #3c3, #3cc, #36e, #c3c, #e33); }
+.sw-custom input { position: absolute; inset: -4px; width: 40px; height: 40px; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.wc .wc-hint { margin-top: 4px; font-size: 11px; color: #6b7c93; }
+/* v10.1 pinout / usage reference panel */
+.pin-win { z-index: 41; width: 640px; }
+.pin-win .pw-h { background: linear-gradient(#2a8a7a, #1f6b5f); }
+.pin-win .pw-board { font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.5); background: rgba(255,255,255,.12); color: #fff; border-radius: 12px; cursor: pointer; white-space: nowrap; }
+.pin-win .pw-board.on { background: #fff; color: #1f6b5f; font-weight: 700; }
+.pin-win .pw-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 10px; background: #eef6f4; border-bottom: 1px solid #d3e4df; }
+.pin-win .pw-nav a, .pin-win .pw-toc a, .pin-win .pw-rel a, .pin-win .pw-sub a, .pin-win .pw-other a { color: #1f6b9f; text-decoration: none; }
+.pin-win .pw-nav a:hover, .pin-win .pw-toc a:hover, .pin-win .pw-rel a:hover, .pin-win .pw-sub a:hover, .pin-win .pw-other a:hover { text-decoration: underline; }
+.pin-win .pw-body { flex: 1; overflow: auto; padding: 4px 14px 24px; line-height: 1.55; font-size: 12.5px; position: relative; }
+.pin-win .pw-body h3 { margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #cfe3dd; font-size: 15px; color: #1f5d52; }
+.pin-win .pw-body h4 { margin: 14px 0 4px; font-size: 13.5px; color: #24435f; }
+.pin-win .pw-body p { margin: 5px 0; }
+.pin-win .pw-intro { color: #3c4f63; }
+.pin-win code { font: 12px Consolas, "DejaVu Sans Mono", monospace; background: #eef2f7; padding: 0 3px; border-radius: 3px; color: #8a2d5c; }
+.pin-win .pw-svg { overflow-x: auto; border: 1px solid #e1e8ef; border-radius: 6px; background: #fbfdff; }
+.pin-win .pw-svg svg { display: block; width: 100%; height: auto; min-width: 560px; }
+.pin-win .pw-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 2px; font-size: 11.5px; color: #4a5b6e; }
+.pin-win .pw-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }
+.pin-win .pw-legend i.ns { background: #fff; border: 1.5px dashed #7b8a9c; box-sizing: border-box; }
+.pin-win .pw-tab { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pin-win .pw-tab th { position: sticky; top: -4px; background: #e8f1ef; text-align: left; padding: 4px 6px; border-bottom: 1px solid #c9dad5; z-index: 1; }
+.pin-win .pw-tab td { padding: 5px 6px; border-bottom: 1px solid #e6edf2; vertical-align: top; }
+.pin-win .pw-pin { white-space: nowrap; min-width: 92px; }
+.pin-win .pw-pin small { display: block; color: #74859a; font-size: 10.5px; white-space: normal; max-width: 140px; }
+.pin-win .pw-tag { display: inline-block; margin: 1px 2px 1px 0; padding: 0 6px; border-radius: 9px; font-size: 11px; color: #fff; white-space: nowrap; }
+.pin-win .pw-tag.pw-dig { background: #5b6b80; } .pin-win .pw-tag.pw-pwm { background: #e8790c; } .pin-win .pw-tag.pw-ana { background: #2f9e44; }
+.pin-win .pw-tag.pw-com { background: #7b4bc4; } .pin-win .pw-tag.pw-int { background: #d6336c; } .pin-win .pw-tag.pw-pwr { background: #d62828; }
+.pin-win .pw-tag.pw-gnd { background: #222; } .pin-win .pw-tag.pw-spc { background: #1971c2; }
+.pin-win .pw-tag.ns { background: #fff !important; color: #55657a; border: 1px dashed #8d9bab; }
+.pin-win .pw-note { margin-top: 3px; font-size: 11.5px; color: #4a5b6e; }
+.pin-win .pw-sim { white-space: nowrap; font-weight: 700; }
+.pin-win .pw-sim small { font-weight: 400; }
+.pin-win .pw-s-yes { color: #1e8e3e; } .pin-win .pw-s-part { color: #c27c0e; } .pin-win .pw-s-no { color: #c0392b; } .pin-win .pw-s-absent { color: #8a99ab; }
+.pin-win .pw-ul { margin: 4px 0; padding-left: 20px; }
+.pin-win .pw-ul li { margin: 3px 0; }
+.pin-win .pw-no { list-style: none; padding-left: 4px; }
+.pin-win .pw-ok { background: #eaf7ee; border-left: 3px solid #2e9e57; padding: 5px 8px; border-radius: 0 4px 4px 0; }
+.pin-win .pw-toc { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0 4px; }
+.pin-win .pw-toc a { background: #eef4fa; border: 1px solid #d5e2ee; border-radius: 12px; padding: 1px 9px; font-size: 11.5px; }
+.pin-win .pw-u, .pin-win .pw-ex { border: 1px solid #e1e8ef; border-radius: 8px; padding: 2px 12px 8px; margin: 10px 0; background: #fff; }
+.pin-win .pw-ex { background: #fbfdfc; border-color: #d3e4df; }
+.pin-win .pw-code { margin: 6px 0; padding: 8px 10px; background: #12181f; color: #d8e6f3; border-radius: 6px; overflow-x: auto; font: 12px/16px Consolas, "DejaVu Sans Mono", monospace; white-space: pre; }
+.pin-win .pw-rel, .pin-win .pw-sub { font-size: 12px; color: #4a5b6e; margin-top: 6px; }
+.pin-win .pw-sub { font-weight: 700; color: #2a4057; }
+.pin-win .pw-sub a { font-weight: 400; }
+.pin-win .pw-wire { margin: 2px 0 4px; padding-left: 20px; font: 12px/1.6 Consolas, "DejaVu Sans Mono", monospace; color: #2b3b4c; }
+.pin-win .pw-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pin-win .pw-btns button { font: inherit; padding: 4px 10px; border: 1px solid #c5d0dc; background: #fff; border-radius: 5px; cursor: pointer; }
+.pin-win .pw-btns button.primary { background: #2a8a7a; border-color: #2a8a7a; color: #fff; font-weight: 600; }
+.pin-win .pw-btns button:hover { filter: brightness(1.06); }
+.pin-win .pw-other { margin-top: 10px; font-weight: 600; }
+.pin-win .pw-ex.flash { animation: pwflash 1.2s ease-out; }
+@keyframes pwflash { from { box-shadow: 0 0 0 3px #f2b705; } to { box-shadow: 0 0 0 0 transparent; } }

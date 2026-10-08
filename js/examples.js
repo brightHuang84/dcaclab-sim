@@ -754,25 +754,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardblink', name: '单片机：Arduino 闪烁 LED (Blink)', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// Blink: the on-board LED (pin 13) and an external LED on pin 8 blink alternately.',
-          'const int LED_EXT = 8;',
-          '',
-          'void setup() {',
-          '  pinMode(LED_BUILTIN, OUTPUT);',
-          '  pinMode(LED_EXT, OUTPUT);',
-          '  Serial.begin(9600);',
-          '  Serial.println("Blink started");',
-          '}',
-          '',
-          'void loop() {',
-          '  digitalWrite(LED_BUILTIN, HIGH);',
-          '  digitalWrite(LED_EXT, LOW);',
-          '  delay(500);',
-          '  digitalWrite(LED_BUILTIN, LOW);',
-          '  digitalWrite(LED_EXT, HIGH);',
-          '  delay(500);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardblink.code });
         const R = b.add('resistor', 420, 160, 0, { R: 220 });
         const L = b.add('led', 560, 160, 0, { color: 'green' });
         b.path([[A, 8], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
@@ -783,39 +765,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardtraffic', name: '单片机：Arduino 交通信号灯', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// Traffic light: red, red + yellow, green, yellow (pins 10, 9, 8).',
-          'const int RED_PIN = 10;',
-          'const int YELLOW_PIN = 9;',
-          'const int GREEN_PIN = 8;',
-          '',
-          'void setLights(bool r, bool y, bool g) {',
-          '  digitalWrite(RED_PIN, r ? HIGH : LOW);',
-          '  digitalWrite(YELLOW_PIN, y ? HIGH : LOW);',
-          '  digitalWrite(GREEN_PIN, g ? HIGH : LOW);',
-          '}',
-          '',
-          'void setup() {',
-          '  pinMode(RED_PIN, OUTPUT);',
-          '  pinMode(YELLOW_PIN, OUTPUT);',
-          '  pinMode(GREEN_PIN, OUTPUT);',
-          '  Serial.begin(9600);',
-          '}',
-          '',
-          'void loop() {',
-          '  Serial.println("RED");',
-          '  setLights(true, false, false);',
-          '  delay(3000);',
-          '  Serial.println("RED + YELLOW");',
-          '  setLights(true, true, false);',
-          '  delay(1000);',
-          '  Serial.println("GREEN");',
-          '  setLights(false, false, true);',
-          '  delay(3000);',
-          '  Serial.println("YELLOW");',
-          '  setLights(false, true, false);',
-          '  delay(1000);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardtraffic.code });
         const rows = [[10, 100, 'red'], [9, 150, 'yellow'], [8, 200, 'green']];
         rows.forEach(([pin, y, col]) => {
           const R = b.add('resistor', 480, y, 0, { R: 220 }), L = b.add('led', 600, y, 0, { color: col });
@@ -831,27 +781,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardbutton', name: '单片机：按钮控制 LED (INPUT_PULLUP)', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// Button with INPUT_PULLUP: pressing the button (pin 2 to GND) lights the LED on pin 7.',
-          'const int BUTTON_PIN = 2;',
-          'const int LED_PIN = 7;',
-          'int lastState = HIGH;',
-          '',
-          'void setup() {',
-          '  pinMode(BUTTON_PIN, INPUT_PULLUP);',
-          '  pinMode(LED_PIN, OUTPUT);',
-          '  Serial.begin(9600);',
-          '}',
-          '',
-          'void loop() {',
-          '  int state = digitalRead(BUTTON_PIN);   // LOW while pressed',
-          '  digitalWrite(LED_PIN, state == LOW ? HIGH : LOW);',
-          '  if (state != lastState) {',
-          '    Serial.println(state == LOW ? "pressed" : "released");',
-          '    lastState = state;',
-          '  }',
-          '  delay(10);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardbutton.code });
         const R = b.add('resistor', 460, 160, 0, { R: 220 }), L = b.add('led', 580, 160, 0, { color: 'red' });
         const S = b.add('button', 600, 220);
         b.path([[A, 7], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
@@ -864,35 +794,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardpwm', name: '单片机：电位器调光 (analogRead → PWM + 串口)', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// Potentiometer on A0 sets the brightness of the LED on pin 9 (PWM, about 490 Hz).',
-          '// The values are printed to the serial monitor; pin 9 is shown on the oscilloscope.',
-          'const int POT_PIN = A0;',
-          'const int LED_PIN = 9;',
-          'unsigned long lastPrint = 0;',
-          '',
-          'void setup() {',
-          '  pinMode(LED_PIN, OUTPUT);',
-          '  Serial.begin(9600);',
-          '  Serial.println("pot -> PWM");',
-          '}',
-          '',
-          'void loop() {',
-          '  int raw = analogRead(POT_PIN);           // 0..1023',
-          '  int duty = map(raw, 0, 1023, 0, 255);     // 0..255',
-          '  analogWrite(LED_PIN, duty);',
-          '  if (millis() - lastPrint >= 250) {',
-          '    lastPrint = millis();',
-          '    float volts = raw * 5.0 / 1023.0;',
-          '    Serial.print("A0 = ");',
-          '    Serial.print(raw);',
-          '    Serial.print("  (");',
-          '    Serial.print(volts);',
-          '    Serial.print(" V)  PWM = ");',
-          '    Serial.println(duty);',
-          '  }',
-          '  delay(20);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardpwm.code });
         const R = b.add('resistor', 320, 180, 0, { R: 220 }), L = b.add('led', 200, 180, 2, { color: 'red' });
         const P = b.add('pot', 520, 620, 0, { R: 10000, pos: 0.5 });
         const O = b.add('scope', 760, 160, 0, { tdiv: 1e-3, v1div: 2, pos1: -2, ch2on: false });
@@ -908,29 +810,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardservo', name: '单片机：舵机扫动 (Servo 库)', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// Servo sweep: the servo on pin 9 moves from 0 to 180 degrees and back.',
-          '#include <Servo.h>',
-          '',
-          'Servo myServo;',
-          'int angle = 0;',
-          'int step = 5;',
-          '',
-          'void setup() {',
-          '  myServo.attach(9, 1000, 2000);   // pulse width 1.0 ms = 0 deg ... 2.0 ms = 180 deg',
-          '  Serial.begin(9600);',
-          '}',
-          '',
-          'void loop() {',
-          '  myServo.write(angle);',
-          '  if (angle % 45 == 0) {',
-          '    Serial.print("angle = ");',
-          '    Serial.println(angle);',
-          '  }',
-          '  angle += step;',
-          '  if (angle <= 0 || angle >= 180) step = -step;',
-          '  delay(50);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardservo.code });
         const M = b.add('servo', 100, 600, 2);
         b.path([[M, 1], [320, 600], [A, 20]], RED);
         b.path([[M, 0], [340, 620], [A, 24]], BLK);
@@ -941,28 +821,7 @@ const EXAMPLES = (() => {
     {
       id: 'ardlcd', name: '单片机：LCD1602 显示计数 (LiquidCrystal)', build() {
         const b = builder();
-        const A = b.add('arduino', 400, 380, 0, { code: [
-          '// LCD1602 with the LiquidCrystal library (4-bit mode): RS=3, RW=4, E=5, D4..D7 = 9..12.',
-          '// Pin 13 switches the backlight on; the second line shows a counter.',
-          '#include <LiquidCrystal.h>',
-          '',
-          'LiquidCrystal lcd(3, 4, 5, 9, 10, 11, 12);',
-          'int counter = 0;',
-          '',
-          'void setup() {',
-          '  pinMode(13, OUTPUT);',
-          '  digitalWrite(13, HIGH);      // backlight',
-          '  lcd.begin(16, 2);',
-          '  lcd.print("Hello, Arduino!");',
-          '}',
-          '',
-          'void loop() {',
-          '  lcd.setCursor(0, 1);',
-          '  lcd.print("count: ");',
-          '  lcd.print(counter);',
-          '  counter++;',
-          '  delay(500);',
-          '}', ''].join('\n') });
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardlcd.code });
         const Lc = b.add('lcd1602', 410, 100, 2, { line1: '', line2: '' });
         const Rv = b.add('resistor', 620, 240, 0, { R: 100000 });
         for (const [li, pin] of [[3, 3], [4, 4], [5, 5], [10, 9], [11, 10], [12, 11], [13, 12], [14, 13], [15, 23]]) b.path([[Lc, li], [A, pin]], li === 15 ? BLK : li === 14 ? RED : BLU);
@@ -976,24 +835,120 @@ const EXAMPLES = (() => {
     {
       id: 'tinyblink', name: '单片机：ATtiny85 闪烁 LED', build() {
         const b = builder();
-        const T = b.add('attiny85', 400, 300, 0, { code: [
-          '// ATtiny85 blink: LED on PB0 (pin 5), 250 ms on / 750 ms off.',
-          '#define LED_PIN PB0',
-          '',
-          'void setup() {',
-          '  pinMode(LED_PIN, OUTPUT);',
-          '}',
-          '',
-          'void loop() {',
-          '  digitalWrite(LED_PIN, HIGH);',
-          '  delay(250);',
-          '  digitalWrite(LED_PIN, LOW);',
-          '  delay(750);',
-          '}', ''].join('\n') });
+        const T = b.add('attiny85', 400, 300, 0, { code: MCU_EX.tinyblink.code });
         const B = b.add('battery', 400, 480, 0, { V: 5 });
         const R = b.add('resistor', 480, 240, 0, { R: 330 }), L = b.add('led', 600, 240, 0, { color: 'yellow' });
         b.path([[T, 4], [420, 240], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
         b.path([[L, 1], [680, 240], [680, 440], [340, 440]], BLK);
+        b.path([[B, 0], [340, 440]], BLK); b.path([[340, 440], [340, 400], [420, 400], [T, 3]], BLK);
+        b.path([[B, 1], [460, 520], [280, 520], [280, 200], [360, 200], [T, 7]], RED);
+        return b.done();
+      },
+    },
+    // ---------------- v10.1: more microcontroller examples (programs and wiring notes in mcu-examples.js)
+    {
+      id: 'arddebounce', name: '单片机：按键消抖 切换 LED (millis)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.arddebounce.code });
+        const R = b.add('resistor', 460, 160, 0, { R: 220 }), L = b.add('led', 580, 160, 0, { color: 'red' });
+        const S = b.add('button', 600, 220);
+        b.path([[A, 8], [380, 160], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
+        b.path([[A, 2], [520, 220], [S, 0]], BLU);
+        b.path([[L, 1], [680, 160]], BLK); b.path([[S, 1], [680, 220]], BLK); b.path([[680, 220], [680, 160]], BLK);
+        b.path([[680, 160], [680, 80], [260, 80], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardnight', name: '单片机：光敏电阻小夜灯 (LDR → PWM)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardnight.code });
+        const R = b.add('resistor', 320, 180, 0, { R: 220 }), L = b.add('led', 200, 180, 2, { color: 'white' });
+        const R1 = b.add('resistor', 380, 600, 0, { R: 10000 });
+        const Ld = b.add('ldr', 500, 660, 0, { pos: 0.35 });
+        b.path([[A, 9], [R, 1]], ORG); b.wire(R, 0, L, 0, 0, ORG);
+        b.path([[L, 1], [160, 200], [260, 200]], BLK); b.path([[260, 200], [A, 23]], BLK);
+        b.path([[A, 20], [320, 600], [R1, 0]], RED); b.path([[R1, 1], [A, 14]], BLU);
+        b.path([[R1, 1], [420, 660], [Ld, 0]], BLU);
+        b.path([[Ld, 1], [540, 700], [360, 700], [A, 25]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardmulti', name: '单片机：millis() 多任务 (不用 delay)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardmulti.code });
+        const R1 = b.add('resistor', 460, 160, 0, { R: 220 }), L1 = b.add('led', 580, 160, 0, { color: 'red' });
+        const R2 = b.add('resistor', 500, 210, 0, { R: 220 }), L2 = b.add('led', 620, 210, 0, { color: 'green' });
+        b.path([[A, 8], [380, 160], [R1, 0]], ORG); b.wire(R1, 1, L1, 0, 0, ORG);
+        b.path([[A, 7], [420, 210], [R2, 0]], GRN); b.wire(R2, 1, L2, 0, 0, GRN);
+        b.path([[L1, 1], [700, 160]], BLK); b.path([[L2, 1], [700, 210]], BLK); b.path([[700, 210], [700, 160]], BLK);
+        b.path([[700, 160], [700, 80], [260, 80], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardmotor', name: '单片机：MOSFET 驱动直流电机调速 (PWM)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardmotor.code });
+        const P = b.add('pot', 520, 620, 0, { R: 10000, pos: 0.6 });
+        const Q = b.add('nmos', 700, 240, 0, { part: 'IRLZ44N', Vth: 1.5, K: 6.5 });
+        const Rg = b.add('resistor', 620, 320, 0, { R: 220 });
+        const Rpd = b.add('resistor', 680, 360, 1, { R: 10000 });
+        const Mo = b.add('motor', 840, 180, 1);
+        const Dd = b.add('diode', 900, 180, 3, { part: '1N4007', Is: 7.03e-9, nf: 1.808, Rs: 0.034 });
+        const Bt = b.add('battery', 960, 200, 3, { V: 6 });
+        b.path([[P, 2], [520, 540], [420, 540], [A, 14]], BLU);
+        b.path([[A, 24], [340, 660], [480, 660]], BLK); b.path([[480, 660], [P, 0]], BLK);
+        b.path([[A, 20], [320, 680], [560, 680], [P, 1]], RED);
+        b.path([[A, 9], [360, 230], [580, 230], [Rg, 0]], ORG);
+        b.path([[Q, 0], [Rpd, 0]], ORG); b.path([[Rg, 1], [Rpd, 0]], ORG);
+        b.path([[Q, 1], [700, 300], [840, 300], [Mo, 1]], BLU);
+        b.wire(Dd, 1, Mo, 0, 0, RED); b.wire(Dd, 0, Mo, 1, 0, BLU); b.wire(Bt, 1, Dd, 1, 0, RED);
+        b.path([[Q, 2], [720, 420]], BLK); b.path([[Rpd, 1], [680, 420]], BLK); b.path([[680, 420], [720, 420]], BLK);
+        b.path([[720, 420], [960, 420], [Bt, 0]], BLK);
+        b.path([[680, 420], [620, 420], [620, 720], [360, 720], [A, 25]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardrelay', name: '单片机：继电器模块 定时开关 12V 灯', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardrelay.code });
+        const Rm = b.add('relaymod', 720, 180, 0, { trig: 'high', Vcoil: 5 });
+        const Lb = b.add('bulb', 900, 100, 0, { Vr: 12, Pr: 5 });
+        const Bt = b.add('battery', 1000, 180, 1, { V: 12 });
+        b.path([[Rm, 2], [420, 200], [A, 7]], YEL);
+        b.path([[Rm, 1], [260, 180], [A, 23]], BLK);
+        b.path([[Rm, 0], [200, 160], [200, 560], [320, 560], [A, 20]], RED);
+        b.path([[Rm, 3], [820, 160], [820, 100], [Lb, 0]], ORG);
+        b.path([[Lb, 1], [1000, 100], [Bt, 0]], BLK);
+        b.path([[Rm, 4], [880, 180], [880, 280], [1000, 280], [Bt, 1]], RED);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardtone', name: '单片机：无源蜂鸣器播放旋律 (tone)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: MCU_EX.ardtone.code });
+        const R = b.add('resistor', 460, 160, 0, { R: 100 });
+        const Bz = b.add('pbuzzer', 560, 130, 0);
+        b.path([[A, 8], [380, 160], [R, 0]], ORG); b.path([[R, 1], [Bz, 0]], ORG);
+        b.path([[Bz, 1], [640, 160], [640, 80], [260, 80], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'tinyfade', name: '单片机：ATtiny85 PWM 呼吸灯', build() {
+        const b = builder();
+        const T = b.add('attiny85', 400, 300, 0, { code: MCU_EX.tinyfade.code });
+        const B = b.add('battery', 400, 480, 0, { V: 5 });
+        const R = b.add('resistor', 480, 240, 0, { R: 330 }), L = b.add('led', 600, 240, 0, { color: 'yellow' });
+        const R2 = b.add('resistor', 480, 180, 0, { R: 330 }), L2 = b.add('led', 600, 180, 0, { color: 'green' });
+        b.path([[T, 4], [420, 240], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
+        b.path([[T, 5], [400, 180], [R2, 0]], GRN); b.wire(R2, 1, L2, 0, 0, GRN);
+        b.path([[L, 1], [680, 240]], BLK); b.path([[L2, 1], [680, 180], [680, 240]], BLK);
+        b.path([[680, 240], [680, 440], [340, 440]], BLK);
         b.path([[B, 0], [340, 440]], BLK); b.path([[340, 440], [340, 400], [420, 400], [T, 3]], BLK);
         b.path([[B, 1], [460, 520], [280, 520], [280, 200], [360, 200], [T, 7]], RED);
         return b.done();

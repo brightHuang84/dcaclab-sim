@@ -802,7 +802,8 @@ const MCU = (() => {
       '<button class="mw-check">✓ ' + esc(_t('mcu.check')) + '</button>' +
       '<button class="mw-upload primary" title="Ctrl+S / Ctrl+Enter">⬆ ' + esc(_t('mcu.upload')) + '</button>' +
       '<button class="mw-reset">⟲ ' + esc(_t('mcu.reset_chip')) + '</button>' +
-      '<button class="mw-revert" title="' + esc(_t('mcu.revert_title')) + '">↺ ' + esc(_t('mcu.revert')) + '</button></div>' +
+      '<button class="mw-revert" title="' + esc(_t('mcu.revert_title')) + '">↺ ' + esc(_t('mcu.revert')) + '</button>' +
+      '<button class="mw-pin" title="' + esc(_t('help.title')) + '">📌 ' + esc(_t('help.btn')) + '</button></div>' +
       '<div class="mw-ed"><div class="mw-gut"></div><textarea class="mw-code" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea></div>' +
       '<div class="mw-msg"></div>' +
       '<div class="mw-sh"><b>⌨ ' + esc(_t('mcu.serial_monitor')) + '</b><span class="mw-baud">9600 baud</span><span class="mw-sp"></span>' +
@@ -892,6 +893,7 @@ const MCU = (() => {
     const $q = (s) => el.querySelector(s);
     const ta = $q('.mw-code');
     $q('.mw-x').onclick = closeEditor;
+    $q('.mw-pin').onclick = () => { const c = compById(W.id); if (typeof MCUHELP !== 'undefined' && MCUHELP) MCUHELP.open(c ? c.type : null); };
     $q('.mw-check').onclick = () => doCompile(false);
     $q('.mw-upload').onclick = () => doCompile(true);
     $q('.mw-reset').onclick = () => { const c = compById(W.id); if (c) { c.state.rt = null; c.state.ser = ''; W.serLen = -1; app.toast(_t('mcu.toast_reset')); } };

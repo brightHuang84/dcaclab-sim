@@ -640,7 +640,7 @@ const app = {
     const selW = this.sel && this.sel.wire;
     for (const w of this.wires) this.drawWire(ctx, w, w === selW);
     for (const c of this.comps) if (!DEFS[c.type].board) this.drawComp(ctx, c, env);
-    if (this.showCurrent && this.hasRun) for (const w of this.wires) if (Math.abs(w._i) > 1e-6) this.drawDotsOn(ctx, this.wirePts(w), w._phase, 1);
+    if (this.showCurrent && this.hasRun) for (const w of this.wires) if (Math.abs(w._i) > 1e-6) this.drawDotsOn(ctx, this.wirePts(w), w._phase, 1, w.color);
     for (const c of this.comps) DEFS[c.type].terms.forEach((_, i) => {
       const [x, y] = this.termPos(c, i), n = cnt.get(pkey(x, y)) || 0;
       ctx.fillStyle = '#6e5212'; ctx.beginPath(); ctx.arc(x, y, 4.6, 0, 7); ctx.fill();
@@ -717,15 +717,18 @@ const app = {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     if (selected) { path(); ctx.strokeStyle = 'rgba(30,136,229,0.45)'; ctx.lineWidth = 12; ctx.stroke(); }
     ctx.save(); ctx.translate(1.2, 2); path(); ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 6; ctx.stroke(); ctx.restore();
-    path(); ctx.strokeStyle = U.shade(w.color, -0.45); ctx.lineWidth = 6; ctx.stroke();
+    const light = typeof hexLum === 'function' && hexLum(w.color) > 0.55;
+    path(); ctx.strokeStyle = U.shade(w.color, light ? -0.62 : -0.45); ctx.lineWidth = light ? 6.6 : 6; ctx.stroke();
     path(); ctx.strokeStyle = w.color; ctx.lineWidth = 4.2; ctx.stroke();
     ctx.save(); ctx.translate(-0.6, -0.9); path(); ctx.strokeStyle = 'rgba(255,255,255,0.38)'; ctx.lineWidth = 1.3; ctx.stroke(); ctx.restore();
   },
-  drawDotsOn(ctx, p, phase, alpha) {
+  drawDotsOn(ctx, p, phase, alpha, color) {
     const SP = 16, lens = []; let L = 0;
     for (let i = 0; i < p.length - 1; i++) { const l = Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]); lens.push(l); L += l; }
     const ph = ((phase % SP) + SP) % SP;
-    ctx.globalAlpha = alpha; ctx.fillStyle = '#ffe14a'; ctx.strokeStyle = 'rgba(90,60,0,0.8)'; ctx.lineWidth = 0.8;
+    // yellow dots with a dark rim; on light / yellow wires (v10.1 colours) dark-blue dots with a white rim instead
+    const light = color && typeof hexLum === 'function' && hexLum(color) > 0.45;
+    ctx.globalAlpha = alpha; ctx.fillStyle = light ? '#14304f' : '#ffe14a'; ctx.strokeStyle = light ? 'rgba(255,255,255,0.95)' : 'rgba(90,60,0,0.8)'; ctx.lineWidth = light ? 1.1 : 0.8;
     for (let s = ph; s < L; s += SP) {
       let d = s, i = 0; while (i < lens.length - 1 && d > lens[i]) { d -= lens[i]; i++; }
       const f = lens[i] ? d / lens[i] : 0, x = p[i][0] + (p[i + 1][0] - p[i][0]) * f, y = p[i][1] + (p[i + 1][1] - p[i][1]) * f;

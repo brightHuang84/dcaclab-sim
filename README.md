@@ -1,8 +1,8 @@
-# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v10
+# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v10.1
 
-**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 49 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar. **v9** adds box selection and group editing (move, rotate, copy/paste, delete), selection-only export with a file-name dialog, import as replace or merge, and automatic merging of wire chains. **v10** adds programmable microcontrollers: an Arduino-Uno-style board and an ATtiny85-style 8-pin chip that run your own Arduino-C (or JavaScript) program in simulated time and drive the circuit through their pins, with a built-in code editor and serial monitor.
+**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 56 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar. **v9** adds box selection and group editing (move, rotate, copy/paste, delete), selection-only export with a file-name dialog, import as replace or merge, and automatic merging of wire chains. **v10** adds programmable microcontrollers: an Arduino-Uno-style board and an ATtiny85-style 8-pin chip that run your own Arduino-C (or JavaScript) program in simulated time and drive the circuit through their pins, with a built-in code editor and serial monitor. **v10.1** adds an in-app **pinout & usage reference** for both chips (pin map, every pin's functions, electrical limits, what is simulated, common circuits, and 14 one-click examples; also as Markdown in [docs/pinout-zh.md](docs/pinout-zh.md) / [docs/pinout-en.md](docs/pinout-en.md)) and **wire colours**.
 
-> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。v9 新增：选择模式（框选多个器件、整体移动/旋转/复制粘贴/删除）、仅导出选中部分、导出时自定义文件名、导入时可选择替换或合并插入，以及首尾相连的导线自动合并。v10 新增：可编程单片机——Arduino Uno 风格开发板和 ATtiny85 风格 8 脚芯片，用 Arduino C（或 JavaScript）写程序，在仿真时间里运行并通过引脚驱动电路；自带代码编辑器和串口监视器。
+> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。v9 新增：选择模式（框选多个器件、整体移动/旋转/复制粘贴/删除）、仅导出选中部分、导出时自定义文件名、导入时可选择替换或合并插入，以及首尾相连的导线自动合并。v10 新增：可编程单片机——Arduino Uno 风格开发板和 ATtiny85 风格 8 脚芯片，用 Arduino C（或 JavaScript）写程序，在仿真时间里运行并通过引脚驱动电路；自带代码编辑器和串口监视器。v10.1 新增：开发板/芯片的「引脚说明与用法」面板（引脚图、每个引脚的功能、电气极限、仿真支持情况、常规用法和 14 个可一键载入的示例；文档版见 [docs/pinout-zh.md](docs/pinout-zh.md)），以及导线颜色选择。
 
 This is a self-contained circuit simulator that runs in the browser, inspired by DCACLab. It is written in plain HTML, CSS and JavaScript (classic `<script>` tags). There is no build step, no CDN and no network access. The whole UI is localised (see Languages below).
 
@@ -12,7 +12,7 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
 - URL options:
   - `?example=<id>&run=1` loads an example and starts it.
   - `?fresh=1` skips the autosave.
-- Example ids: `ohm, series, parallel, rc, led, fuse, dimmer, acdiode, rlc, scope, scopesq, npn, zener, ne555, breadboard, opinv, opnoninv, comparator, halfadder, clockblink, counter, lissajous, fft, relay, motor, xfmr, sensors, boost, reg7805, lm317, rgbmix, opto, scr, buckaa`; **v7:** `movsurge, tl431, nightlight, l298n, relaymod, hallreed, lcd1602, buzzers`; **v10:** `ardblink, ardtraffic, ardbutton, ardpwm, ardservo, ardlcd, tinyblink`.
+- Example ids: `ohm, series, parallel, rc, led, fuse, dimmer, acdiode, rlc, scope, scopesq, npn, zener, ne555, breadboard, opinv, opnoninv, comparator, halfadder, clockblink, counter, lissajous, fft, relay, motor, xfmr, sensors, boost, reg7805, lm317, rgbmix, opto, scr, buckaa`; **v7:** `movsurge, tl431, nightlight, l298n, relaymod, hallreed, lcd1602, buzzers`; **v10:** `ardblink, ardtraffic, ardbutton, ardpwm, ardservo, ardlcd, tinyblink`; **v10.1:** `arddebounce, ardnight, ardmulti, ardmotor, ardrelay, ardtone, tinyfade`.
 
 ## Languages / 多语言 (i18n)
 - **Locales:** `zh-CN` (source), `zh-TW`, `en`, `ja`, `ko`, `es`, `fr`, `de`, `ru`, `pt-BR`. Every user-facing string is translated: the toolbar, palette categories and part names, properties (labels, units, options), live readings, status bar, toasts and warnings (including convergence messages), help tips, advanced settings, the analysis table, multimeter modes, and example names and descriptions. Part numbers (7805, LM317, NE555, …) and SI units are kept as is. English subtitles appear only in the Chinese locales.
@@ -71,11 +71,27 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
   - **Replace circuit**, or
   - **Merge / insert**: the file's parts are added at the view centre as a *selected group* that you can drag into place; selection exports default to this.
 - **Wire auto-merge:** a point that joins exactly two wire ends and nothing else (no terminal, no breadboard hole, no third wire) is not a real junction.
-  - The two wires become one polyline: the point turns into a bend, and collinear vertices are removed. The colour of the longer wire is kept.
+  - The two wires become one polyline: the point turns into a bend, and collinear vertices are removed.
+  - **Wires of different colours are never merged** (v10.1): the joint stays a real two-wire point so each keeps its colour. Same-colour chains merge as before.
   - Merging runs with every edit (drawing, dragging ends/segments, deleting a part or wire, group moves, paste, import) as part of the same undo step, and when any circuit or old save is loaded.
   - T-junctions (3+ wires) and points on terminals are never merged.
   - Dropping a wire end on the middle of a wire still splits it into a junction; deleting that branch later re-merges the two halves.
   - The topology is identical, so simulation results do not change.
+
+## Wire colours (v10.1) / 导线颜色
+- Select one or more wires (click, Ctrl/Shift+click or box select). The properties panel shows a **导线颜色 / Wire colour** row: red, black, blue, green, yellow, orange, white, purple, grey, brown, plus a custom colour picker. The current colour is highlighted (none when the selected wires differ).
+- A change applies to **all selected wires as one undo step** (Ctrl+Z restores every wire's previous colour).
+- **New wires use the last chosen colour**, remembered in `localStorage` (`dcaclab-wirecolor`); `?fresh=1` starts with the default red.
+- Colours are stored as `#rrggbb` in saves, autosave, exported JSON (whole circuit and selection) and import/merge. Older files without a colour still load, with the default red.
+- Wires of different colours are **not auto-merged** (see *Wire auto-merge*).
+- Light colours (white, yellow) get a dark outline, and the current-flow dots switch to a dark colour on light wires, so the current animation stays visible on every colour.
+- Tip (common convention): red = +V, black = GND, other colours for signals.
+
+## Pinout & usage reference (v10.1) / 引脚说明与用法
+- Open it with **📌 引脚说明 / Pinout** in the program editor's toolbar or in the chip's properties panel. It is a scrollable, draggable, resizable window placed beside the editor, with a toggle between **Arduino Uno** and **ATtiny85**, and follows the UI language (all 10 locales).
+- Contents: an SVG **pin map**; a **table of every pin** (functions as coloured tags, notes, and whether the simulator supports it: ✓ / partial / ✗ / pin not on the part, with non-simulated functions dashed); **electrical limits**; **what is simulated**; **usage sections** (digital output and LED resistor, buttons with pull-up/pull-down and debounce, analog input with pot / divider / LDR / NTC, PWM, motors via transistor/MOSFET + flyback diode, relays, tone, servo, LCD1602, Serial, `millis()` multitasking, powering the board); and **examples** at the end, each with description, wiring, code and the buttons **载入到画布** (load and run), **插入编辑器** (put the code into the current chip's editor, not uploaded yet) and **复制代码**.
+- Key facts shown (from the ATmega328P / ATtiny85 datasheets and the Uno R3 schematic): Uno PWM on D3/D9/D10/D11 ≈ 490 Hz and D5/D6 ≈ 980 Hz; A0–A5 10-bit ADC (also digital 14–19), A4 = SDA, A5 = SCL; D0 = RX, D1 = TX; external interrupts D2 (INT0) and D3 (INT1); SPI D10 SS, D11 MOSI, D12 MISO, D13 SCK; L LED on D13; 40 mA absolute maximum / 20 mA recommended per pin, 200 mA total; VIN 7–12 V recommended. ATtiny85: DIP-8 order 1 PB5, 2 PB3, 3 PB4, 4 GND, 5 PB0, 6 PB1, 7 PB2, 8 VCC; PWM on PB0/PB1/PB4; ADC0–ADC3 = PB5/PB2/PB4/PB3; USI (DI/SDA = PB0, DO = PB1, USCK/SCL = PB2); PB5 = RESET.
+- The same content as Markdown with SVG pin maps: [docs/pinout-zh.md](docs/pinout-zh.md) (中文) and [docs/pinout-en.md](docs/pinout-en.md) (English), generated from the app's own data by `node tools/gen-pinout-docs.js`.
 
 ## Microcontrollers (v10) / 可编程单片机
 Two programmable parts live in the new **单片机 Microcontrollers** palette category. You write a program, press **Compile & upload**, and the chip runs it in *simulated* time, driving LEDs, transistors, servos, the LCD and any other part through its pins and reading switches, dividers and sensors back.
@@ -87,7 +103,7 @@ Two programmable parts live in the new **单片机 Microcontrollers** palette ca
   - **Power** property: *USB* (an ideal 5 V source with 0.1 Ω, no wiring needed) or *external* (VIN → on-board 5 V regulator with 1.1 V dropout and 0.8 A limit; feed VIN with 7–12 V). The 3.3 V pin has its own 150 mA regulator. The board itself draws ≈ 45 mA.
   - The chip boots when its 5 V rail reaches 2.7 V and stops below 2.4 V (brown-out), so an external supply that sags really resets the program.
 - **ATtiny85 单片机 (8 脚 DIP)**: pins PB0–PB5, VCC and GND in the real DIP-8 pinout. It has **no built-in supply** — connect VCC and GND (2.7–5.5 V). PWM on PB0, PB1, PB4; ADC channels A1 = PB2, A2 = PB4, A3 = PB3 (A0 = PB5). PB5 is RESET with an internal pull-up: pulling it low holds the chip in reset unless the *PB5 as I/O* property is ticked. `LED_BUILTIN` is PB1 (as on Digispark-style boards).
-- **Pin electrical model:** an output is a 25 Ω push-pull driver to the chip's own VCC/GND rails, so a pin's high level sags under load (≈ 4.7 V at 12 mA) and a short is a real 200 mA fault (a toast warns above 40 mA). `INPUT` is high impedance (10 MΩ), `INPUT_PULLUP` adds 35 kΩ to VCC. `digitalRead` uses the ATmega thresholds: low below 0.3·VCC, high above 0.6·VCC, previous value in between (hysteresis). `analogRead` is 10-bit against VCC (`DEFAULT`), 1.1 V (`INTERNAL`) or the AREF value, and takes 112 µs.
+- **Pin electrical model:** an output is a 25 Ω push-pull driver to the chip's own VCC/GND rails, so a pin's high level sags under load (≈ 4.7 V at 12 mA) and a short is a real 200 mA fault (a toast warns above 40 mA). `INPUT` is high impedance (10 MΩ), `INPUT_PULLUP` adds 35 kΩ to VCC. `digitalRead` uses the ATmega thresholds: low below 0.3·VCC, high above 0.6·VCC, previous value in between (hysteresis). `analogRead` is 10-bit against VCC (`DEFAULT`) or 1.1 V (`INTERNAL`) and takes 112 µs; the parts have no AREF pin, so `EXTERNAL` is treated as VCC.
 - **How a program runs:** the program is translated into JavaScript *generator* functions. Every `delay()`, `delayMicroseconds()`, `pulseIn()` and loop back-edge yields to the simulator, so time is simulated, not wall-clock: `delay(500)` toggles a pin after exactly 0.5 s of simulated time, whatever the speed setting, and the browser never blocks. Instructions cost a small amount of simulated time (≈ 0.25 µs per loop iteration, 3.5 µs per digital I/O, 112 µs per ADC conversion). Pin changes are timestamped and the solver splits the time step at each change (up to 256 events per step), so edges land on the exact simulated time (blink edges at 0.500 s, 1.000 s …, measured error < 0.1 µs) while PWM, tone and servo waveforms are generated as real switching (averaged automatically when the period is shorter than 4 time steps).
 - **Languages** (the 编程语言 property, or the drop-down in the editor):
   - **Arduino C/C++ subset** (default): `setup()` / `loop()`, global and local variables, constants, `#define` (also function-like macros), `#include` (Servo.h / LiquidCrystal.h / Arduino.h are known; others give a warning), `#if/#ifdef/#ifndef/#elif/#else/#endif`, functions with parameters and return values (recursion allowed), `if/else`, `for`, `while`, `do…while`, `switch/case`, `break/continue/return`, ternary, all C operators with C precedence, compound assignment, `++/--`, casts, `sizeof`, arrays (also 2-D, initialisers), `enum`, `static` locals, `const`, `PROGMEM` (ignored), integer literals in dec/hex/octal/binary with `U`/`L` suffixes, char and string literals with escapes. Types `void bool boolean char unsigned char byte int unsigned int short word long unsigned long float double int8_t…uint32_t size_t String` with **AVR semantics**: `int` is 16-bit and wraps (32767 + 1 = −32768), `long` is 32-bit, integer division truncates, `/` and `%` by zero are runtime errors, `float` and `double` are the same.
@@ -109,7 +125,7 @@ Two programmable parts live in the new **单片机 Microcontrollers** palette ca
 - **Serial monitor** (bottom of the editor, or ⌨ 串口监视器): live output with autoscroll and clear, a send box (Enter appends `\n`), and the baud rate from `Serial.begin`. Output is capped at the last 20 000 characters.
 - **Saving:** the program text and language are ordinary properties of the part, so they are saved with the circuit (localStorage, autosave, exported JSON), undo/redo covers uploads, and a circuit with a program opens unchanged in any UI language.
 - **Runaway guard:** a JavaScript loop that never yields stops with "runaway loop" after 400 000 iterations in one time step. A C `while (1) {}` behaves like real hardware: the chip is busy forever (simulated time advances, pins keep their state), but the browser stays responsive.
-- **Examples:** Blink (on-board L + external LED on D8), traffic light (D10/D9/D8), button with `INPUT_PULLUP` (D2 → LED on D7, prints pressed/released), potentiometer → `analogRead` → PWM LED with `Serial` and an oscilloscope on D9, servo sweep (D9), LiquidCrystal "Hello, Arduino!" with a counter, ATtiny85 blink on a 5 V battery.
+- **Examples:** Blink (on-board L + external LED on D8), traffic light (D10/D9/D8), button with `INPUT_PULLUP` (D2 → LED on D7, prints pressed/released), potentiometer → `analogRead` → PWM LED with `Serial` and an oscilloscope on D9, servo sweep (D9), LiquidCrystal "Hello, Arduino!" with a counter, ATtiny85 blink on a 5 V battery. **v10.1:** debounced button toggling an LED, LDR night light (A0 divider → LED on D9 in the dark), `millis()` multitasking (two LEDs at different rates + Serial), PWM motor speed via a logic-level MOSFET with flyback diode, relay module switching a 12 V lamp on a timer, `tone()` melody on a passive buzzer, ATtiny85 PWM fade on PB0/PB1. All 14 are also in the pinout panel.
 
 ## Components
 | Category | Parts |
@@ -293,6 +309,8 @@ Users should never have to touch solver settings. v7 reworks the nonlinear solve
   - On v7: 0 failures, Vout = 5.000 V, LED = 20 mA, 7805 Vin ≈ 8.2–8.3 V.
 
 ## Examples
+**v10.1 (单片机):** debounced button · LDR night light · millis() multitasking · MOSFET motor PWM · relay timer · tone() melody · ATtiny85 PWM fade.
+
 **v10 (单片机):** Arduino blink · traffic light · button with INPUT_PULLUP · potentiometer → PWM with Serial and scope · servo sweep · LiquidCrystal LCD1602 · ATtiny85 blink.
 
 **v7:** MOV surge clamp (220 V mains → 100 mH line choke → 14D471K ∥ 40 W bulb; press the button to dump a 1 kV / 220 µF surge through 10 Ω: the MOV clamps at ≈742 V / 15.6 A and absorbs ≈15 J, the bulb survives — delete the MOV and the bulb sees ≈906 V and burns) · TL431 reference 12 V → 4.991 V (R1 = R2 = 10 k) · LM393 + LDR night light (LED on in the dark) · L298N motor forward / reverse / brake with two switches · relay module (low-level trigger) switching a 12 V lamp · Hall A3144 and reed switch LEDs · LCD1602 "Hello, DCACLab!" with backlight and contrast resistor · active buzzer + 1 kHz crystal oscillator driving a passive buzzer.
@@ -304,7 +322,16 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
 
 ## Tests
 `tests/` contains the Playwright scripts used during development. They need `npm i playwright-core`, a Chrome at `/usr/bin/google-chrome`, and the folder served on port 8765. The older suites run the page with `locale: 'zh-CN'`.
-- `test11.js` runs **74 v10 microcontroller checks**:
+- `test12.js` runs **72 v10.1 checks**:
+  - every pinout/usage/example/wire-colour key exists in all 10 locales;
+  - pin facts in the reference data against the simulator's board definitions and the datasheets (PWM pins and frequencies, ADC channels, I²C/SPI/UART/interrupt pins, ATtiny85 DIP order, limits);
+  - the panel in all 10 languages for both chips: opened from the properties panel and the editor toolbar, board toggle, side-by-side with the editor without overlap, scrollable, contents (SVG, every pin row, limits, simulation notes, usage, examples), no Chinese in non-Chinese locales; live language switch and section navigation;
+  - every usage code snippet compiles;
+  - the new examples are in the examples menu; all 14 examples load from the panel and run with no runtime error, no non-converged step and no warning, with behaviour checks on their output (debounced press count, night-light PWM value, multitask uptime, motor speed, relay ON → OFF, tone notes, both ATtiny fade LEDs);
+  - insert into editor, upload, board mismatch warning, no-chip message, copy to clipboard;
+  - wire colours: palette in the panel, single and multi-wire change as one undo/redo step, custom picker, remembered colour for new wires (also after reload), save/load, selection export, old files without colour, different colours not merged while same colours merge, the outline on white wires; the colour UI in 10 languages.
+- `shots11.js` makes screenshots 58–63 (Uno pinout panel, ATtiny85 pinout panel, a usage section, the examples section, a new example running, coloured wires).
+- `test11.js` runs **81 v10 microcontroller checks** (74 at v10, plus the new examples):
   - translator: a program using most of the C subset prints 40 values that are compared line by line with AVR semantics (16-bit wrap, truncating division, `%` sign, unsigned wrap, HEX/BIN printing, macros, enums, static locals, recursion, `String`, `switch` fall-through, 2-D arrays, `sprintf`, `strcpy/strcat` …);
   - 13 compile errors (missing `;`, undeclared name, wrong argument count, pointer, missing `loop`, unterminated string, type mismatch, `break` outside a loop, bad array size, unknown method, local function, unexpected end of file, JavaScript syntax error) each report the right line and a localised message; the chip shows the error;
   - timing: Blink toggles every 500 ms within 1 % (in practice < 0.1 µs), the JavaScript Blink every 250 ms, `millis()`/`micros()` after `delay(1000)`, on-board LED current;
@@ -315,7 +342,7 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - power: external 9 V on VIN, brown-out at 3 V and reboot at 7 V; the ATtiny85 needs VCC, blinks PB0 every 500 ms, and is held in reset by a low PB5;
   - Servo pulses 1.0–2.0 ms at 50 Hz and a full sweep; LiquidCrystal text on the LCD1602;
   - save / load in another page and language reproduces the program and its output; the saved JSON is language-neutral; upload + undo;
-  - all 7 MCU examples run 3 simulated seconds with no runtime error, no non-converged step, no pass-over and no warning, each in < 2.5 s of wall time;
+  - all MCU examples run 3 simulated seconds with no runtime error, no non-converged step, no pass-over and no warning, each in < 2.5 s of wall time;
   - editor UI: double-click opens it with the program, a compile error marks line 14, Ctrl+S uploads, serial monitor output and send box, Tab, auto-indent, properties-panel buttons, live language switch;
   - all new keys in all 10 locales, MCU UI free of Chinese in en / ja / ru; the user 7805 fixture still converges with 0 failed steps.
 - `shots10.js` makes screenshots 52–57 (editor with Blink, running board + serial monitor, pot → PWM with oscilloscope, ATtiny85, LCD1602, compile error).
@@ -398,6 +425,11 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - The stopped DC operating point uses t = 0 for time-varying sources, and treats logic, 555 and relay state as it currently is (initial state before a run).
   - AC ranges need a run to measure RMS.
   - Ω mode on a charged capacitor in a paused circuit ignores the stored charge (Ω is always a DC solve).
+- v10.1 pinout reference and wire colours:
+  - The reference documents pins and functions the simulated parts do not have or do not simulate (RESET/AREF/IOREF/ICSP headers on the Uno, external interrupts, I²C, SPI, hardware UART pins, the ATtiny85 USI and clock pins); these are clearly marked as not simulated.
+  - Library side effects listed in the text (e.g. `tone()` disabling PWM on D3/D11, `Servo` disabling PWM on D9/D10) are real-hardware facts and are not modelled.
+  - Serial on the ATtiny85 is a virtual monitor (the real chip has no hardware UART).
+  - Wires of different colours are not merged, so a recoloured chain stays as several wires.
 - v10 microcontrollers:
   - The C dialect is a subset: no pointers, references, `struct`/`class`/`union`, templates, `goto`, function pointers, `new`/`delete`, interrupts (`attachInterrupt`, ISRs, timers/registers such as `PORTB`, `DDRB`), EEPROM, Wire (I²C), SPI or SoftwareSerial. Unsupported syntax gives a clear "不支持的语法" error with the line number rather than a wrong result.
   - Program execution is not cycle-accurate: each statement costs a fixed small amount of simulated time, so tight loops run at roughly real speed but not to the clock cycle. `millis()` is exact; `micros()` has 1 µs resolution.
