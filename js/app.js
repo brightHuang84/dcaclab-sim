@@ -336,6 +336,7 @@ const app = {
   },
   loadExample(id) {
     const ex = EXAMPLES.find(e => e.id === id) || EXAMPLES[0];
+    if (typeof MCU !== 'undefined') MCU.closeEditor();
     this.load(ex.build());
     this.fitView();
     this.toast(_t('app.example_loaded') + ex.name);
@@ -431,6 +432,7 @@ const app = {
     for (const c of this.comps) if (c.type === 'ac' && c.props.f > 0) fmin = Math.min(fmin, c.props.f);
     if (isFinite(fmin)) { const T = 1 / fmin; this.acWin = T * Math.max(1, Math.ceil(0.2 / T)); } else this.acWin = 0.2;
     this.evComps = this.comps.filter(c => DEFS[c.type].event);
+    this.mcuComps = this.comps.filter(c => DEFS[c.type].mcu);
     this.net = m; this.nodeCount = N; this.dirty = false;
   },
   computeWireCurrents() {
@@ -480,6 +482,25 @@ const app = {
   simStep() {
     if (this.dirty || !this.net) this.rebuild();
     const m = this.net, t0 = this.t, h = this.dt, t = t0 + h;
+    const ok = this.mcuComps && this.mcuComps.length ? this._mcuStep(m, t0, h, t) : this._stepLoc(m, t0, h, t);
+    this.t = t; this.hasRun = true;
+    for (const c of this.comps) {
+      const n = c._nodes, mm = c._m;
+      mm.V = n.length > 1 ? m.v(n[0]) - m.v(n[1]) : 0; // drop along terminal 1 -> 2 (same direction as the positive current)
+      mm.I = c._p ? c._p.i : 0; mm.P = undefined;
+      const d = DEFS[c.type];
+      if (d.measure) d.measure(c, m);
+      if (mm.P === undefined) mm.P = Math.abs(mm.V * mm.I);
+    }
+    for (const c of this.comps) { const d = DEFS[c.type]; if (d.post) d.post(c, this.dt, this); }
+    let maxI = 0;
+    for (const p of m.prims) if (p.t === 'V') maxI = Math.max(maxI, Math.abs(p.i));
+    this.maxSrcI = maxI;
+    if (!ok) this.noteConvFail(m, t);
+    this.warn = !ok ? _t('app.convergence_difficulty_continuing_wi') : (maxI > 500 ? _t('app.short_circuit_detected_current') + U.fmt(maxI, 'A', 3) : '');
+  },
+  // one time step with event localisation for switching parts (555): rewind and split the step at the event
+  _stepLoc(m, t0, h, t) {
     const evc = this.evComps;
     const snap = evc.length && this.eventLoc ? m.snapshot() : null;
     let ok = m.step(t);
@@ -499,21 +520,31 @@ const app = {
         this.events = (this.events || 0) + 1;
       }
     }
-    this.t = t; this.hasRun = true;
-    for (const c of this.comps) {
-      const n = c._nodes, mm = c._m;
-      mm.V = n.length > 1 ? m.v(n[0]) - m.v(n[1]) : 0; // drop along terminal 1 -> 2 (same direction as the positive current)
-      mm.I = c._p ? c._p.i : 0; mm.P = undefined;
-      const d = DEFS[c.type];
-      if (d.measure) d.measure(c, m);
-      if (mm.P === undefined) mm.P = Math.abs(mm.V * mm.I);
+    return ok;
+  },
+  // v10: microcontrollers run their programs up to the end of the step; every timed pin change inside the step
+  // splits it (backward-Euler sub-steps), so edges land at their exact simulated time
+  _mcuStep(m, t0, h, t1) {
+    const mc = this.mcuComps, minsp = Math.max(1e-6, h / 64);
+    let tc = t0, n = 0, ok = true;
+    const adv = () => {
+      let e = Infinity;
+      for (const c of mc) { const rt = c.state.rt; if (rt) { rt.minsp = minsp; const x = rt.advance(tc, t1, !!m._solved || tc > t0); if (x < e) e = x; } }
+      return e;
+    };
+    let te = adv();
+    if (!(te < t1 - minsp)) ok = this._stepLoc(m, t0, h, t1);
+    else {
+      while (te < t1 - minsp && n < 256) {
+        m.finalize(te - tc, 'be'); if (!m.step(te)) ok = false;
+        tc = te; n++; te = adv();
+      }
+      m.finalize(t1 - tc, 'be'); if (!m.step(t1)) ok = false;
+      m.dt = h; m.needStamp = true;
+      this.mcuSplits = (this.mcuSplits || 0) + n;
     }
-    for (const c of this.comps) { const d = DEFS[c.type]; if (d.post) d.post(c, this.dt, this); }
-    let maxI = 0;
-    for (const p of m.prims) if (p.t === 'V') maxI = Math.max(maxI, Math.abs(p.i));
-    this.maxSrcI = maxI;
-    if (!ok) this.noteConvFail(m, t);
-    this.warn = !ok ? _t('app.convergence_difficulty_continuing_wi') : (maxI > 500 ? _t('app.short_circuit_detected_current') + U.fmt(maxI, 'A', 3) : '');
+    m._solved = true;   // (events due exactly at t1 fire at the start of the next step, after the measurements)
+    return ok;
   },
   // a step that still failed after every automatic remedy: remember it, mark the components around the worst unknown,
   // show one friendly (throttled) toast; the simulation keeps running with the best-effort solution
@@ -720,7 +751,7 @@ const app = {
       }
     }
     this.render();
-    if (!this._uiT || ts - this._uiT > 120) { this._uiT = ts; this.updateHud(); this.updateReadings(); this.updateTooltip(); this.updateAnalysis && this.updateAnalysis(); }
+    if (!this._uiT || ts - this._uiT > 120) { this._uiT = ts; this.updateHud(); this.updateReadings(); this.updateTooltip(); this.updateAnalysis && this.updateAnalysis(); if (typeof MCU !== 'undefined') MCU.tick(); }
     requestAnimationFrame((t) => this.frame(t));
   },
   updateHud() {

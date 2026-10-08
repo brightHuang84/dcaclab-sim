@@ -750,6 +750,255 @@ const EXAMPLES = (() => {
         return b.done();
       },
     },
+    // ---------------- v10: programmable microcontrollers (program text is plain ASCII so circuits stay language-independent)
+    {
+      id: 'ardblink', name: '单片机：Arduino 闪烁 LED (Blink)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// Blink: the on-board LED (pin 13) and an external LED on pin 8 blink alternately.',
+          'const int LED_EXT = 8;',
+          '',
+          'void setup() {',
+          '  pinMode(LED_BUILTIN, OUTPUT);',
+          '  pinMode(LED_EXT, OUTPUT);',
+          '  Serial.begin(9600);',
+          '  Serial.println("Blink started");',
+          '}',
+          '',
+          'void loop() {',
+          '  digitalWrite(LED_BUILTIN, HIGH);',
+          '  digitalWrite(LED_EXT, LOW);',
+          '  delay(500);',
+          '  digitalWrite(LED_BUILTIN, LOW);',
+          '  digitalWrite(LED_EXT, HIGH);',
+          '  delay(500);',
+          '}', ''].join('\n') });
+        const R = b.add('resistor', 420, 160, 0, { R: 220 });
+        const L = b.add('led', 560, 160, 0, { color: 'green' });
+        b.path([[A, 8], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
+        b.path([[L, 1], [640, 160], [640, 100], [260, 100], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardtraffic', name: '单片机：Arduino 交通信号灯', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// Traffic light: red, red + yellow, green, yellow (pins 10, 9, 8).',
+          'const int RED_PIN = 10;',
+          'const int YELLOW_PIN = 9;',
+          'const int GREEN_PIN = 8;',
+          '',
+          'void setLights(bool r, bool y, bool g) {',
+          '  digitalWrite(RED_PIN, r ? HIGH : LOW);',
+          '  digitalWrite(YELLOW_PIN, y ? HIGH : LOW);',
+          '  digitalWrite(GREEN_PIN, g ? HIGH : LOW);',
+          '}',
+          '',
+          'void setup() {',
+          '  pinMode(RED_PIN, OUTPUT);',
+          '  pinMode(YELLOW_PIN, OUTPUT);',
+          '  pinMode(GREEN_PIN, OUTPUT);',
+          '  Serial.begin(9600);',
+          '}',
+          '',
+          'void loop() {',
+          '  Serial.println("RED");',
+          '  setLights(true, false, false);',
+          '  delay(3000);',
+          '  Serial.println("RED + YELLOW");',
+          '  setLights(true, true, false);',
+          '  delay(1000);',
+          '  Serial.println("GREEN");',
+          '  setLights(false, false, true);',
+          '  delay(3000);',
+          '  Serial.println("YELLOW");',
+          '  setLights(false, true, false);',
+          '  delay(1000);',
+          '}', ''].join('\n') });
+        const rows = [[10, 100, 'red'], [9, 150, 'yellow'], [8, 200, 'green']];
+        rows.forEach(([pin, y, col]) => {
+          const R = b.add('resistor', 480, y, 0, { R: 220 }), L = b.add('led', 600, y, 0, { color: col });
+          b.path([[A, pin], [b.tp(A, pin)[0], y], [R, 0]], col === 'red' ? RED : col === 'yellow' ? YEL : GRN);
+          b.wire(R, 1, L, 0, 0, col === 'red' ? RED : col === 'yellow' ? YEL : GRN);
+          b.path([[L, 1], [680, y]], BLK);
+        });
+        b.path([[680, 200], [680, 150]], BLK); b.path([[680, 150], [680, 100]], BLK);
+        b.path([[680, 100], [680, 60], [260, 60], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardbutton', name: '单片机：按钮控制 LED (INPUT_PULLUP)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// Button with INPUT_PULLUP: pressing the button (pin 2 to GND) lights the LED on pin 7.',
+          'const int BUTTON_PIN = 2;',
+          'const int LED_PIN = 7;',
+          'int lastState = HIGH;',
+          '',
+          'void setup() {',
+          '  pinMode(BUTTON_PIN, INPUT_PULLUP);',
+          '  pinMode(LED_PIN, OUTPUT);',
+          '  Serial.begin(9600);',
+          '}',
+          '',
+          'void loop() {',
+          '  int state = digitalRead(BUTTON_PIN);   // LOW while pressed',
+          '  digitalWrite(LED_PIN, state == LOW ? HIGH : LOW);',
+          '  if (state != lastState) {',
+          '    Serial.println(state == LOW ? "pressed" : "released");',
+          '    lastState = state;',
+          '  }',
+          '  delay(10);',
+          '}', ''].join('\n') });
+        const R = b.add('resistor', 460, 160, 0, { R: 220 }), L = b.add('led', 580, 160, 0, { color: 'red' });
+        const S = b.add('button', 600, 220);
+        b.path([[A, 7], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
+        b.path([[A, 2], [520, 220], [S, 0]], BLU);
+        b.path([[L, 1], [680, 160]], BLK); b.path([[S, 1], [680, 220]], BLK); b.path([[680, 220], [680, 160]], BLK);
+        b.path([[680, 160], [680, 80], [260, 80], [A, 23]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardpwm', name: '单片机：电位器调光 (analogRead → PWM + 串口)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// Potentiometer on A0 sets the brightness of the LED on pin 9 (PWM, about 490 Hz).',
+          '// The values are printed to the serial monitor; pin 9 is shown on the oscilloscope.',
+          'const int POT_PIN = A0;',
+          'const int LED_PIN = 9;',
+          'unsigned long lastPrint = 0;',
+          '',
+          'void setup() {',
+          '  pinMode(LED_PIN, OUTPUT);',
+          '  Serial.begin(9600);',
+          '  Serial.println("pot -> PWM");',
+          '}',
+          '',
+          'void loop() {',
+          '  int raw = analogRead(POT_PIN);           // 0..1023',
+          '  int duty = map(raw, 0, 1023, 0, 255);     // 0..255',
+          '  analogWrite(LED_PIN, duty);',
+          '  if (millis() - lastPrint >= 250) {',
+          '    lastPrint = millis();',
+          '    float volts = raw * 5.0 / 1023.0;',
+          '    Serial.print("A0 = ");',
+          '    Serial.print(raw);',
+          '    Serial.print("  (");',
+          '    Serial.print(volts);',
+          '    Serial.print(" V)  PWM = ");',
+          '    Serial.println(duty);',
+          '  }',
+          '  delay(20);',
+          '}', ''].join('\n') });
+        const R = b.add('resistor', 320, 180, 0, { R: 220 }), L = b.add('led', 200, 180, 2, { color: 'red' });
+        const P = b.add('pot', 520, 620, 0, { R: 10000, pos: 0.5 });
+        const O = b.add('scope', 760, 160, 0, { tdiv: 1e-3, v1div: 2, pos1: -2, ch2on: false });
+        b.path([[A, 9], [360, 240]], ORG); b.path([[360, 240], [R, 1]], ORG); b.wire(R, 0, L, 0, 0, ORG);
+        b.path([[L, 1], [160, 200], [260, 200]], BLK); b.path([[260, 200], [A, 23]], BLK);
+        b.path([[O, 0], [360, 240]], YEL);
+        b.path([[P, 2], [520, 540], [420, 540], [A, 14]], BLU);
+        b.path([[A, 24], [340, 660], [480, 660]], BLK); b.path([[480, 660], [P, 0]], BLK); b.path([[O, 2], [800, 660], [480, 660]], BLK);
+        b.path([[A, 20], [320, 680], [560, 680], [P, 1]], RED);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardservo', name: '单片机：舵机扫动 (Servo 库)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// Servo sweep: the servo on pin 9 moves from 0 to 180 degrees and back.',
+          '#include <Servo.h>',
+          '',
+          'Servo myServo;',
+          'int angle = 0;',
+          'int step = 5;',
+          '',
+          'void setup() {',
+          '  myServo.attach(9, 1000, 2000);   // pulse width 1.0 ms = 0 deg ... 2.0 ms = 180 deg',
+          '  Serial.begin(9600);',
+          '}',
+          '',
+          'void loop() {',
+          '  myServo.write(angle);',
+          '  if (angle % 45 == 0) {',
+          '    Serial.print("angle = ");',
+          '    Serial.println(angle);',
+          '  }',
+          '  angle += step;',
+          '  if (angle <= 0 || angle >= 180) step = -step;',
+          '  delay(50);',
+          '}', ''].join('\n') });
+        const M = b.add('servo', 100, 600, 2);
+        b.path([[M, 1], [320, 600], [A, 20]], RED);
+        b.path([[M, 0], [340, 620], [A, 24]], BLK);
+        b.path([[M, 2], [180, 160], [360, 160], [A, 9]], ORG);
+        return b.done();
+      },
+    },
+    {
+      id: 'ardlcd', name: '单片机：LCD1602 显示计数 (LiquidCrystal)', build() {
+        const b = builder();
+        const A = b.add('arduino', 400, 380, 0, { code: [
+          '// LCD1602 with the LiquidCrystal library (4-bit mode): RS=3, RW=4, E=5, D4..D7 = 9..12.',
+          '// Pin 13 switches the backlight on; the second line shows a counter.',
+          '#include <LiquidCrystal.h>',
+          '',
+          'LiquidCrystal lcd(3, 4, 5, 9, 10, 11, 12);',
+          'int counter = 0;',
+          '',
+          'void setup() {',
+          '  pinMode(13, OUTPUT);',
+          '  digitalWrite(13, HIGH);      // backlight',
+          '  lcd.begin(16, 2);',
+          '  lcd.print("Hello, Arduino!");',
+          '}',
+          '',
+          'void loop() {',
+          '  lcd.setCursor(0, 1);',
+          '  lcd.print("count: ");',
+          '  lcd.print(counter);',
+          '  counter++;',
+          '  delay(500);',
+          '}', ''].join('\n') });
+        const Lc = b.add('lcd1602', 410, 100, 2, { line1: '', line2: '' });
+        const Rv = b.add('resistor', 620, 240, 0, { R: 100000 });
+        for (const [li, pin] of [[3, 3], [4, 4], [5, 5], [10, 9], [11, 10], [12, 11], [13, 12], [14, 13], [15, 23]]) b.path([[Lc, li], [A, pin]], li === 15 ? BLK : li === 14 ? RED : BLU);
+        b.path([[Lc, 2], [520, 240], [Rv, 0]], ORG);
+        b.path([[Lc, 1], [540, 210], [680, 210]], RED); b.path([[680, 210], [680, 240]], RED); b.path([[Rv, 1], [680, 240]], RED);
+        b.path([[680, 240], [680, 560], [320, 560], [A, 20]], RED);
+        b.path([[Lc, 0], [560, 180], [700, 180], [700, 580], [340, 580], [A, 24]], BLK);
+        return b.done();
+      },
+    },
+    {
+      id: 'tinyblink', name: '单片机：ATtiny85 闪烁 LED', build() {
+        const b = builder();
+        const T = b.add('attiny85', 400, 300, 0, { code: [
+          '// ATtiny85 blink: LED on PB0 (pin 5), 250 ms on / 750 ms off.',
+          '#define LED_PIN PB0',
+          '',
+          'void setup() {',
+          '  pinMode(LED_PIN, OUTPUT);',
+          '}',
+          '',
+          'void loop() {',
+          '  digitalWrite(LED_PIN, HIGH);',
+          '  delay(250);',
+          '  digitalWrite(LED_PIN, LOW);',
+          '  delay(750);',
+          '}', ''].join('\n') });
+        const B = b.add('battery', 400, 480, 0, { V: 5 });
+        const R = b.add('resistor', 480, 240, 0, { R: 330 }), L = b.add('led', 600, 240, 0, { color: 'yellow' });
+        b.path([[T, 4], [420, 240], [R, 0]], ORG); b.wire(R, 1, L, 0, 0, ORG);
+        b.path([[L, 1], [680, 240], [680, 440], [340, 440]], BLK);
+        b.path([[B, 0], [340, 440]], BLK); b.path([[340, 440], [340, 400], [420, 400], [T, 3]], BLK);
+        b.path([[B, 1], [460, 520], [280, 520], [280, 200], [360, 200], [T, 7]], RED);
+        return b.done();
+      },
+    },
   ];
   return list;
 })();

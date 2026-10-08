@@ -66,6 +66,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; font-family: var(--ui-fo
 .readings { background: #fff; border: 1px solid #dbe3ec; border-radius: 8px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
 .readings:empty { display: none; }
 .readings > div { display: flex; justify-content: space-between; padding: 2px 0; }
+.readings .rk { white-space: nowrap; margin-right: 10px; }
+.readings .rk + b { text-align: right; }
 .readings .rt, .help .rt { font-weight: 700; color: #53657a; font-size: 12px; margin-bottom: 4px; }
 .readings .big { font-size: 22px; font-weight: 700; color: #1b3a5c; justify-content: center; background: #eaf3df; border-radius: 6px; margin: 2px 0 6px; }
 .readings .warn { color: #d62828; font-weight: 700; }
@@ -124,3 +126,37 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .dlg-b button.primary { background: #2b7de0; color: #fff; border-color: #2b7de0; }
 .bulk .field { margin: 6px 0; }
 .ic-sel { display: inline-block; width: 11px; height: 10px; border: 1.6px dashed currentColor; border-radius: 2px; vertical-align: -1px; box-sizing: border-box; }
+
+/* ---------- v10: microcontroller program editor + serial monitor (floating window) ---------- */
+.mcu-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.mcu-btns button { font: inherit; font-size: 12px; padding: 5px 10px; border: 1px solid #c5d0dc; background: #fff; border-radius: 6px; cursor: pointer; }
+.mcu-btns button.primary { background: #2b7de0; color: #fff; border-color: #2b7de0; }
+.mcu-btns button:hover { filter: brightness(1.05); }
+.mcu-win { position: fixed; z-index: 40; width: 580px; height: 600px; display: none; flex-direction: column; background: #fff; border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(10,20,40,.35); border: 1px solid #b8c6d6; overflow: hidden; font-size: 12px; color: #243142; min-width: 380px; min-height: 360px; }
+.mcu-win .mw-h { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: linear-gradient(#2f6fbf, #23589c); color: #fff; cursor: move; user-select: none; }
+.mcu-win .mw-title { font-weight: 700; font-size: 13px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcu-win .mw-title small { opacity: .7; font-weight: 400; }
+.mcu-win .mw-st { font-size: 11px; padding: 2px 8px; border-radius: 9px; background: rgba(255,255,255,.18); white-space: nowrap; }
+.mcu-win .mw-st.run { background: #27ae60; } .mcu-win .mw-st.cerr, .mcu-win .mw-st.rerr { background: #c0392b; } .mcu-win .mw-st.reset { background: #e67e22; }
+.mcu-win .mw-x { background: none; border: none; color: #fff; font-size: 15px; cursor: pointer; padding: 0 4px; }
+.mcu-win .mw-tb { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #dde4ec; background: #f4f7fa; flex-wrap: wrap; }
+.mcu-win .mw-tb button, .mcu-win .mw-sh button, .mcu-win .mw-in button { font: inherit; padding: 4px 10px; border: 1px solid #c5d0dc; background: #fff; border-radius: 5px; cursor: pointer; }
+.mcu-win .mw-tb button.primary { background: #2b7de0; color: #fff; border-color: #2b7de0; font-weight: 600; }
+.mcu-win .mw-tb button:hover, .mcu-win .mw-sh button:hover { filter: brightness(1.06); }
+.mcu-win .mw-tb select { font: inherit; padding: 3px 4px; }
+.mcu-win .mw-ed { flex: 3; display: flex; min-height: 120px; background: #fbfcfe; border-bottom: 1px solid #dde4ec; position: relative; }
+.mcu-win .mw-gut { width: 40px; overflow: hidden; background: #eef2f7; color: #8a99ab; text-align: right; padding: 6px 6px 6px 0; box-sizing: border-box;
+  font: 13px/18px Consolas, "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; user-select: none; }
+.mcu-win .mw-gut div.err { background: #e74c3c; color: #fff; border-radius: 3px 0 0 3px; }
+.mcu-win .mw-code { flex: 1; border: none; outline: none; resize: none; padding: 6px 8px; margin: 0; background: transparent; color: #1d2b3a; white-space: pre; overflow: auto;
+  font: 13px/18px Consolas, "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; tab-size: 2; }
+.mcu-win .mw-msg { padding: 5px 10px; min-height: 18px; font-size: 12px; color: #53657a; background: #f8fafc; border-bottom: 1px solid #dde4ec; }
+.mcu-win .mw-msg.err { background: #fdecea; color: #a52a1a; } .mcu-win .mw-msg.ok { background: #eaf7ee; color: #1e7e44; }
+.mcu-win .mw-msg a { color: inherit; font-weight: 700; }
+.mcu-win .mw-sh { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #f4f7fa; border-bottom: 1px solid #dde4ec; }
+.mcu-win .mw-sh .mw-baud { color: #8a99ab; } .mcu-win .mw-sh .mw-sp { flex: 1; }
+.mcu-win .mw-ser { flex: 1.4; margin: 0; padding: 6px 8px; overflow: auto; background: #12181f; color: #9fe8a8; font: 12px/16px Consolas, "DejaVu Sans Mono", monospace; min-height: 60px; white-space: pre-wrap; word-break: break-all; }
+.mcu-win .mw-in { display: flex; gap: 6px; padding: 6px 8px; background: #f4f7fa; }
+.mcu-win .mw-in input { flex: 1; font: 12px Consolas, monospace; padding: 4px 6px; border: 1px solid #c5d0dc; border-radius: 5px; }
+.mcu-win .mw-grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #9fb0c4 50%, #9fb0c4 60%, transparent 60%, transparent 70%, #9fb0c4 70%, #9fb0c4 80%, transparent 80%); }

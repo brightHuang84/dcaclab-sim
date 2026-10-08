@@ -457,12 +457,15 @@ Object.assign(DEFS, {
       if ((M.Vdd || 0) > 7) { st.burnt = true; app.dirty = true; app.toast(_t('lcd1602.lcd1602_damaged_by_excessive_supply')); }
       st.init = (M.Vdd || 0) >= 4.5 ? true : (M.Vdd || 0) < 2.7 ? false : !!st.init;
     },
-    text(c, i) { const M = c._m; return String(c.props['line' + i] || '').replace('{V}', U.fmt(M.Vdd || 0, 'V', 3)).replace('{t}', (window.app ? app.t : 0).toFixed(2) + 's').slice(0, 16).padEnd(16, ' '); },
+    text(c, i) {
+      const st = c.state;
+      if (st.dd) { if (!st.ddOn) return ' '.repeat(16); const row = st.dd[i - 1]; let s = ''; for (let k = 0; k < 16; k++) s += row[(st.ddOff + k) % 40]; return s; }   // v10: written by a microcontroller (LiquidCrystal)
+      const M = c._m; return String(c.props['line' + i] || '').replace('{V}', U.fmt(M.Vdd || 0, 'V', 3)).replace('{t}', (window.app ? app.t : 0).toFixed(2) + 's').slice(0, 16).padEnd(16, ' '); },
     contrast(c) { return U.clamp(((c._m.Vlcd || 0) - 3.0) / 1.2, 0, 1); },
     readings(c) {
       const M = c._m, st = c.state, ct = DEFS.lcd1602.contrast(c);
       return [['VDD', U.fmt(M.Vdd || 0, 'V') + (st.init ? '' : _t('lcd1602.unpowered_undervoltage'))], [_t('lcd1602.contrast_vdd_v0'), U.fmt(M.Vlcd || 0, 'V') + (ct <= 0 ? _t('lcd1602.too_faint') : (M.Vlcd || 0) > 4.7 ? _t('lcd1602.too_dark_blocks') : _t('lcd1602.normal'))],
-        [_t('lcd1602.backlight_current'), U.fmt(Math.max(0, M.Ibl || 0), 'A')], [_t('common.display'), st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—'], [_t('common.note'), _t('lcd1602.text_is_set_by_the_properties_as_if')]];
+        [_t('lcd1602.backlight_current'), U.fmt(Math.max(0, M.Ibl || 0), 'A')], [_t('common.display'), st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—'], [_t('common.note'), st.dd ? _t('mcu.lcd_driven') : _t('lcd1602.text_is_set_by_the_properties_as_if')]];
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.lcd1602.terms) D.lead(ctx, x, y, x, -48);
