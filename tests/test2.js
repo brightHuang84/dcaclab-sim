@@ -64,7 +64,8 @@ const { chromium } = require('playwright-core');
   // save to localStorage, export download, import
   await page.click('#btn-save');
   R.localSaved = await page.evaluate(() => !!localStorage.getItem('dcaclab-sim-saved'));
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export')]);
+  await page.click('#btn-export'); await page.waitForSelector('#dlg-ok');   // v9: export opens the file-name dialog
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#dlg-ok')]);
   const p = '/workspace/dcaclab-sim-test/export.json'; await dl.saveAs(p);
   R.exportFile = dl.suggestedFilename();
   await page.evaluate(() => app.clearAll());

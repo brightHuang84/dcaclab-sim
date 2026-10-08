@@ -20,6 +20,7 @@
       <button id="btn-undo" title="撤销 (Ctrl+Z)" data-i18n-title="h.undo_title">↶</button>
       <button id="btn-redo" title="重做 (Ctrl+Y)" data-i18n-title="h.redo_title">↷</button>
       <button id="btn-wire" title="导线模式 (W)" data-i18n-title="h.wire_title">✎ <span data-i18n="h.wire">导线</span></button>
+      <button id="btn-select" title="选择模式：在空白处拖动框选多个器件 (V)" data-i18n-title="h.select_title"><span class="ic-sel"></span> <span data-i18n="h.select">选择</span></button>
       <button id="btn-rot" title="旋转 (R)" data-i18n-title="h.rot_title">⟳ <span data-i18n="h.rot">旋转</span></button>
       <button id="btn-del" title="删除 (Del)" data-i18n-title="h.del_title">🗑 <span data-i18n="h.del">删除</span></button>
       <button id="btn-clear" title="清空电路" data-i18n-title="h.clear_title">🧹 <span data-i18n="h.clear">清空</span></button>
@@ -68,6 +69,7 @@
     <span id="status-stats"></span>
   </footer>
 </div>
+<div id="dlg"></div>
 <script src="js/i18n.js"></script>
 <script src="js/locales/zh-CN.js"></script>
 <script src="js/locales/zh-TW.js"></script>
@@ -90,6 +92,7 @@
 <script src="js/examples.js"></script>
 <script src="js/app.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/select.js"></script>
 <script src="js/meters.js"></script>
 </body>
 </html>

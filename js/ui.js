@@ -6,6 +6,7 @@ Object.assign(app, {
     const el = $('#props-body'); if (!el) return;
     const s = this.sel;
     if (!s) { el.innerHTML = this.helpHtml(); this.bindSettings(); return; }
+    if (s.multi) { el.innerHTML = this.groupPropsHtml(); this.bindGroupProps(el); return; }
     if (s.wire) {
       const w = s.wire;
       el.innerHTML = _t('ui.wire') + w.pts.length + _t('ui.vertices') +
@@ -21,15 +22,7 @@ Object.assign(app, {
     const c = s.comp, d = DEFS[c.type];
     let h = '<div class="ph"><canvas class="picon" width="56" height="40"></canvas><div class="pt">' + d.name + (I18N.isZh() ? ' <small>' + d.en + '</small>' : '') + '<div class="pid">' + (this.designators().get(c) || '') + ' · #' + c.id + '</div></div></div>';
     if (c.type === 'scope') h += '<canvas id="scope-big" width="226" height="170"></canvas>';
-    for (const p of d.props) {
-      const v = c.props[p.k];
-      if (p.kind === 'range') h += '<div class="field"><label>' + p.label + ' <span class="rv">' + (p.fmt ? p.fmt(v) : Math.round(v * 100) + '%') + '</span></label><input type="range" min="0" max="1" step="0.01" data-k="' + p.k + '" value="' + v + '"></div>';
-      else if (p.kind === 'select') h += '<div class="field"><label>' + p.label + '</label><select data-k="' + p.k + '">' + p.opts.map(([val, lab]) => '<option value="' + val + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + lab + '</option>').join('') + '</select></div>';
-      else if (p.kind === 'bool') h += '<div class="field"><label class="chk"><input type="checkbox" data-k="' + p.k + '"' + (v ? ' checked' : '') + '> ' + p.label + '</label></div>';
-      else if (p.kind === 'color') h += '<div class="field"><label>' + p.label + '</label><div class="swatches">' + Object.entries(p.opts).map(([k, o]) => '<button class="sw' + (k === v ? ' on' : '') + '" title="' + o.name + '" data-k="' + p.k + '" data-v="' + k + '" style="background:' + o.hex + '"></button>').join('') + '</div></div>';
-      else if (p.kind === 'text') h += '<div class="field"><label>' + p.label + '</label><input type="text" class="tprop" maxlength="40" data-k="' + p.k + '" value="' + String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"></div>';
-      else h += '<div class="field"><label>' + p.label + '</label><div class="numrow"><input type="text" data-k="' + p.k + '" value="' + (v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '')) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
-    }
+    for (const p of d.props) h += this.propFieldHtml(p, c.props[p.k]);
     const extra = [];
     if (c.type === 'switch') extra.push('<button id="p-toggle" class="primary">' + (c.props.closed ? _t('ui.open_switch') : _t('ui.close_switch')) + '</button>');
     if (c.type === 'fuse' && c.state.blown) extra.push(_t('ui.replace_fuse'));
@@ -75,8 +68,17 @@ Object.assign(app, {
     on('p-del', () => this.deleteSel());
     this.updateReadings(true);
   },
+  // one properties-panel field (also used by the bulk editor of a multi-selection)
+  propFieldHtml(p, v) {
+    if (p.kind === 'range') return '<div class="field"><label>' + p.label + ' <span class="rv">' + (p.fmt ? p.fmt(v) : Math.round(v * 100) + '%') + '</span></label><input type="range" min="0" max="1" step="0.01" data-k="' + p.k + '" value="' + v + '"></div>';
+    else if (p.kind === 'select') return '<div class="field"><label>' + p.label + '</label><select data-k="' + p.k + '">' + p.opts.map(([val, lab]) => '<option value="' + val + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + lab + '</option>').join('') + '</select></div>';
+    else if (p.kind === 'bool') return '<div class="field"><label class="chk"><input type="checkbox" data-k="' + p.k + '"' + (v ? ' checked' : '') + '> ' + p.label + '</label></div>';
+    else if (p.kind === 'color') return '<div class="field"><label>' + p.label + '</label><div class="swatches">' + Object.entries(p.opts).map(([k, o]) => '<button class="sw' + (k === v ? ' on' : '') + '" title="' + o.name + '" data-k="' + p.k + '" data-v="' + k + '" style="background:' + o.hex + '"></button>').join('') + '</div></div>';
+    else if (p.kind === 'text') return '<div class="field"><label>' + p.label + '</label><input type="text" class="tprop" maxlength="40" data-k="' + p.k + '" value="' + String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"></div>';
+    else return '<div class="field"><label>' + p.label + '</label><div class="numrow"><input type="text" data-k="' + p.k + '" value="' + (v && Math.abs(v) < 1e-9 ? String(v) : U.fmtShort(v, '').replace(/\s/g, '')) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
+  },
   updateReadings(force) {
-    const r = document.getElementById('readings'); if (!r || !this.sel) return;
+    const r = document.getElementById('readings'); if (!r || !this.sel || this.sel.multi) return;
     if (!force && !this.running) return;
     const z = (v, e) => (Math.abs(v) < e ? 0 : v);
     if (this.sel.wire) { r.innerHTML = _t('ui.live_readings_current_i') + U.fmt(z(this.sel.wire._i, 1e-8), 'A') + '</b></div>'; return; }
@@ -150,6 +152,7 @@ Object.assign(app, {
       _t('ui.r_rotate_del_delete_space_run_pause') +
       _t('ui.ctrl_z_undo_ctrl_d_duplicate_w_wire') +
       _t('ui.a_wire_passing_exactly_over_a_termin') +
+      '<li>' + _t('sel.help1') + '</li><li>' + _t('sel.help2') + '</li><li>' + _t('sel.help3') + '</li>' +
       '</ul></div>' +
       _t('ui.simulation_settings') +
       _t('ui.time_step_t_input_type_text_id_set_d') + U.fmtShort(this.dt, '').replace(/\s/g, '') + '"><span class="unit">s</span></div></div>' +
@@ -253,9 +256,10 @@ Object.assign(app, {
   },
   setWireMode(on) {
     this.wireMode = on;
+    if (on && this.selectMode) this.setSelectMode(false);
     const it = document.querySelector('.item[data-type="__wire"]'); if (it) it.classList.toggle('active', on);
     $('#btn-wire').classList.toggle('active', on);
-    this.cv.style.cursor = on ? 'crosshair' : 'default';
+    this.cv.style.cursor = on || this.selectMode ? 'crosshair' : 'default';
   },
   startPaletteDrag(e, type, cv) {
     e.preventDefault();
@@ -301,7 +305,8 @@ Object.assign(app, {
         if (touches.size === 2) { this.cancelDrag(); this.startPinch(touches); return; }
         if (touches.size > 2) return;
       }
-      if (e.button === 1 || e.button === 2) { this.drag = { kind: 'pan', sx, sy, ox: this.view.ox, oy: this.view.oy }; return; }
+      if (e.button === 1 || e.button === 2 || this._space) { if (this._space) this._space.used = true; this.drag = { kind: 'pan', sx, sy, ox: this.view.ox, oy: this.view.oy }; return; }
+      const mod = e.ctrlKey || e.metaKey, add = mod || e.shiftKey, multi = this.sel && this.sel.multi;
       const tol = Math.max(8, 10 / this.view.s);
       const selW = this.sel && this.sel.wire;
       if (selW) {
@@ -315,11 +320,14 @@ Object.assign(app, {
         }
       }
       const pt = this.pointAt(wx, wy, this.wireMode);
-      if (pt) { this.startWire(pt.x, pt.y, pt); return; }
       const hit = this.compAt(wx, wy, false);
-      if (hit) { this.startMove(hit, wx, wy); return; }
+      if (add && hit && !this.wireMode) { this.toggleSelect(hit.c); return; }          // Ctrl/Shift+click: add / remove
+      if (pt) { this.startWire(pt.x, pt.y, pt); return; }
+      if (hit) { if (multi && this.isSelected(hit.c)) this.startGroupDrag(wx, wy, hit.c); else this.startMove(hit, wx, wy); return; }
       const wh = this.wireHit(wx, wy);
       if (wh) {
+        if (!this.wireMode && (mod || (e.shiftKey && this.selectMode))) { this.toggleSelect(wh.w); return; }
+        if (multi && this.isSelected(wh.w) && !this.wireMode && !e.shiftKey) { this.startGroupDrag(wx, wy, wh.w); return; }
         if (this.wireMode || e.shiftKey) {
           const q = this.snapOnWire(wh);
           this.splitWire(wh, q);
@@ -331,10 +339,22 @@ Object.assign(app, {
         return;
       }
       const bh = this.compAt(wx, wy, true);
-      if (bh && !this.wireMode) { this.startMove(bh, wx, wy); return; }
+      if (bh && !this.wireMode) {
+        if (mod) { this.toggleSelect(bh.c); return; }
+        if (multi && this.isSelected(bh.c)) { this.startGroupDrag(wx, wy, bh.c); return; }
+        if (!this.selectMode && !e.shiftKey) { this.startMove(bh, wx, wy); return; }
+      }
       if (this.wireMode) { this.startWire(snap(wx), snap(wy), null); return; }
-      if (this.sel) { this.sel = null; this.refreshProps(); }
-      this.drag = { kind: 'pan', sx, sy, ox: this.view.ox, oy: this.view.oy };
+      // empty canvas: rubber-band selection in select mode / with Shift or Ctrl; otherwise pan (touch: long-press → box)
+      if ((this.selectMode || add) && e.pointerType !== 'touch') { this.drag = { kind: 'box', sx, sy, cx: sx, cy: sy, add, pick: null }; return; }
+      if (this.sel && !this.selectMode) { this.sel = null; this.refreshProps(); }
+      const d = this.drag = { kind: 'pan', sx, sy, ox: this.view.ox, oy: this.view.oy };
+      if (e.pointerType === 'touch') d.lpT = setTimeout(() => {
+        if (this.drag !== d || d.far) return;
+        this.view.ox = d.ox; this.view.oy = d.oy;
+        this.drag = { kind: 'box', sx, sy, cx: sx, cy: sy, add: false, pick: null, touch: true };
+        if (navigator.vibrate) try { navigator.vibrate(15); } catch (err) { /* ignore */ }
+      }, 450);
     });
     cv.addEventListener('pointermove', (e) => {
       const [sx, sy] = pos(e), [wx, wy] = this.toWorld(sx, sy);
@@ -351,11 +371,18 @@ Object.assign(app, {
         const wh = !hit && this.wireHit(wx, wy);
         this.hover = hit ? { comp: hit.c } : (wh ? { wire: wh.w } : null);
         this.hoverStrip = !hit && !wh ? this.holeAt(wx, wy) : (pt ? this.holeAt(pt.x, pt.y) : null);
-        cv.style.cursor = pt ? 'crosshair' : hit ? (DEFS[hit.c.type].click || hit.c.type === 'button' ? 'pointer' : 'move') : wh ? 'grab' : (this.wireMode ? 'crosshair' : 'default');
+        const inSel = this.sel && this.sel.multi && ((hit && this.isSelected(hit.c)) || (wh && this.isSelected(wh.w)));
+        cv.style.cursor = pt ? 'crosshair' : inSel ? 'move' : hit ? (DEFS[hit.c.type].click || hit.c.type === 'button' ? 'pointer' : 'move') : wh ? 'grab' : (this.wireMode || this.selectMode ? 'crosshair' : 'default');
         return;
       }
       this.hover = null;
-      if (d.kind === 'pan') { this.view.ox = d.ox + sx - d.sx; this.view.oy = d.oy + sy - d.sy; cv.style.cursor = 'grabbing'; }
+      if (d.kind === 'pan') { if (Math.hypot(sx - d.sx, sy - d.sy) > 8) { d.far = true; clearTimeout(d.lpT); } this.view.ox = d.ox + sx - d.sx; this.view.oy = d.oy + sy - d.sy; cv.style.cursor = 'grabbing'; }
+      else if (d.kind === 'box') this.updateBox(d, sx, sy);
+      else if (d.kind === 'group') {
+        const dx = snap(wx - d.start[0]), dy = snap(wy - d.start[1]);
+        if (dx !== d.dx || dy !== d.dy) { d.dx = dx; d.dy = dy; d.moved = d.moved || !!(dx || dy); this.applyPlan(d.plan, p => [p[0] + dx, p[1] + dy]); }
+        cv.style.cursor = 'move';
+      }
       else if (d.kind === 'move') this.dragMove(d, wx, wy);
       else if (d.kind === 'wire') {
         const [tx, ty] = this.dropTarget(wx, wy, d.wire);
@@ -373,6 +400,13 @@ Object.assign(app, {
       if (e && e.pointerType === 'touch') { touches.delete(e.pointerId); if (this.pinch) { if (touches.size < 2) this.pinch = null; return; } }
       const d = this.drag; this.drag = null; this.hoverPt = null;
       if (!d) return;
+      if (d.lpT) clearTimeout(d.lpT);
+      if (d.kind === 'box') { this.endBox(d); this.dirty = true; return; }
+      if (d.kind === 'group') {
+        if (d.moved) this.finishPlan(d.plan);
+        else this.setSelection(d.item.pts ? [] : [d.item], d.item.pts ? [d.item] : []);   // plain click on a member: select just it
+        this.dirty = true; return;
+      }
       if (d.kind === 'move') {
         const c = d.comp;
         if (DEFS[c.type].momentary) { c.state.pressed = false; this.dirty = true; }
@@ -490,8 +524,14 @@ Object.assign(app, {
     const mx = d.horiz ? 0 : dx, my = d.vert ? 0 : dy;
     P[d.seg] = [d.a[0] + mx, d.a[1] + my]; P[d.seg + 1] = [d.b[0] + mx, d.b[1] + my];
   },
+  startGroupDrag(wx, wy, item) {
+    const { comps, wires } = this.selItems();
+    this.drag = { kind: 'group', plan: this.groupPlan(comps, wires), start: [wx, wy], dx: 0, dy: 0, moved: false, item };
+  },
   cancelDrag() {
     const d = this.drag; if (!d) return;
+    if (d.lpT) clearTimeout(d.lpT);
+    if (d.kind === 'group' && d.moved) { this.applyPlan(d.plan, p => p); }
     if (d.kind === 'wire') this.wires = this.wires.filter(w => w !== d.wire);
     if (d.kind === 'move' && DEFS[d.comp.type].momentary) d.comp.state.pressed = false;
     this.drag = null;
@@ -512,7 +552,8 @@ Object.assign(app, {
   // ---------- file ops ----------
   saveLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.serialize())); this.toast(_t('ui.saved_to_browser_storage')); } catch (e) { this.toast(_t('ui.save_failed') + e.message); } },
   loadLocal() { const s = localStorage.getItem(SAVE_KEY); if (!s) { this.toast(_t('ui.no_saved_circuit_found')); return; } this.load(s); this.fitView(); this.toast(_t('ui.saved_circuit_loaded')); },
-  download() {
+  download() { this.openExportDialog(); },
+  downloadAllNow() {
     const blob = new Blob([JSON.stringify(this.serialize(), null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     const d = new Date(), pad = (n) => String(n).padStart(2, '0');
@@ -522,7 +563,7 @@ Object.assign(app, {
   },
   upload(file) {
     const r = new FileReader();
-    r.onload = () => { try { this.load(r.result); this.fitView(); this.toast(_t('ui.imported') + file.name); } catch (e) { this.toast(_t('ui.import_failed') + e.message); } };
+    r.onload = () => { try { this.importData(r.result, file.name); } catch (e) { this.toast(_t('ui.import_failed') + e.message); } };
     r.readAsText(file);
   },
 
@@ -537,6 +578,7 @@ Object.assign(app, {
     on('#btn-del', () => this.deleteSel());
     on('#btn-clear', () => { if (confirm(_t('ui.clear_the_whole_circuit'))) this.clearAll(); });
     on('#btn-wire', () => this.setWireMode(!this.wireMode));
+    on('#btn-select', () => this.toggleSelectMode());
     on('#btn-analysis', () => this.toggleAnalysis());
     on('#btn-save', () => this.saveLocal());
     on('#btn-load', () => this.loadLocal());
@@ -551,20 +593,35 @@ Object.assign(app, {
     $('#sel-speed').onchange = (e) => { this.speed = parseFloat(e.target.value); };
     $('#chk-current').onchange = (e) => { this.showCurrent = e.target.checked; };
     document.addEventListener('keydown', (e) => {
+      if (this._dlg) { if (e.key === 'Escape') this.closeDialog(); return; }
       if (e.target.matches('input, select, textarea')) return;
-      const k = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
-      else if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); this.redo(); }
-      else if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); this.duplicateSel(); }
-      else if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); this.saveLocal(); }
-      else if (k === 'r' && !e.ctrlKey) this.rotateSel();
-      else if (k === 'j' && !e.ctrlKey) this.joinPassOvers();
+      const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+      const arrows = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
+      if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
+      else if (mod && k === 'y') { e.preventDefault(); this.redo(); }
+      else if (mod && k === 'd') { e.preventDefault(); this.duplicateSel(); }
+      else if (mod && k === 's') { e.preventDefault(); this.saveLocal(); }
+      else if (mod && k === 'a') { e.preventDefault(); this.selectAll(); }
+      else if (mod && k === 'c') { e.preventDefault(); this.copySelection(); }
+      else if (mod && k === 'x') { e.preventDefault(); this.cutSelection(); }
+      else if (mod && k === 'v') { e.preventDefault(); this.paste(); }
+      else if (arrows[k] && this.sel) { e.preventDefault(); const st = e.shiftKey ? 5 * GRID : GRID; this.moveSelection(arrows[k][0] * st, arrows[k][1] * st); }
+      else if (k === 'r' && !mod) this.rotateSel();
+      else if (k === 'j' && !mod) this.joinPassOvers();
       else if (k === 'delete' || k === 'backspace') { e.preventDefault(); this.deleteSel(); }
-      else if (k === ' ') { e.preventDefault(); this.toggleRun(); }
-      else if (k === 'w') this.setWireMode(!this.wireMode);
-      else if (k === 'escape') { this.sel = null; this.setWireMode(false); this.refreshProps(); }
+      else if (k === ' ') { e.preventDefault(); if (!e.repeat) this._space = { used: false }; }   // tap = run/pause, hold + drag = pan
+      else if (k === 'w' && !mod) this.setWireMode(!this.wireMode);
+      else if (k === 'v' && !mod) this.toggleSelectMode();
+      else if (k === 'escape') { if (this.drag && this.drag.kind === 'box') this.drag = null; this.sel = null; this.setWireMode(false); this.refreshProps(); }
     });
+    document.addEventListener('keyup', (e) => {
+      if (e.key !== ' ') return;
+      const sp = this._space; this._space = null;
+      if (sp && !sp.used && !e.target.matches('input, select, textarea') && !this._dlg) { e.preventDefault(); this.toggleRun(); }
+    });
+    window.addEventListener('blur', () => { this._space = null; });
   },
+  toggleSelectMode() { this.setSelectMode(!this.selectMode); this.toast(this.selectMode ? _t('sel.mode_on') : _t('sel.mode_off')); },
 
   buildExamples() {
     const exSel = $('#sel-example'); if (!exSel) return;
@@ -582,6 +639,7 @@ Object.assign(app, {
     this.buildPalette(); if (this.wireMode) this.setWireMode(true);
     this.buildExamples(); this.updateRunBtn(); this.refreshProps(); this.updateAnalysis(true);
     if (this.updateHud) this.updateHud();
+    if (this._dlg === 'export') this.openExportDialog(); else if (this._dlg) this.closeDialog();
     this.dirty = true;
   },
   init() {
