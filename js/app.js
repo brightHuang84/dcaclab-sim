@@ -256,11 +256,13 @@ const app = {
   },
   deleteSel() {
     if (!this.sel) return;
+    if (this.sel.multi) { this.deleteGroup(); return; }
     if (this.sel.comp) this.comps = this.comps.filter(c => c !== this.sel.comp);
     if (this.sel.wire) this.wires = this.wires.filter(w => w !== this.sel.wire);
     this.sel = null; this.dirty = true; this.changed(); this.refreshProps();
   },
   rotateSel() {
+    if (this.sel && this.sel.multi) { this.rotateGroup(); return; }
     const c = this.sel && this.sel.comp;
     if (c && DEFS[c.type].board) { // rotate the board together with everything plugged into it
       const keys = new Set(bbHoles(c).map(h => pkey(h.x, h.y)));
@@ -283,6 +285,7 @@ const app = {
     }
   },
   duplicateSel() {
+    if (this.sel && this.sel.multi) { this.duplicateGroup(); return; }
     const c = this.sel && this.sel.comp; if (!c) return;
     const n = this.addComp(c.type, c.x + 40, c.y + 40, c.rot, JSON.parse(JSON.stringify(c.props)));
     this.sel = { comp: n }; this.changed(); this.refreshProps();
@@ -290,7 +293,7 @@ const app = {
   clearAll() { this.comps = []; this.wires = []; this.sel = null; this.resetSim(); this.dirty = true; this.changed(); this.refreshProps(); },
   serialize() {
     return {
-      app: 'dcaclab-sim', version: 2,
+      app: 'dcaclab-sim', version: 2, ...(this.title ? { title: this.title } : {}),
       comps: this.comps.map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y, rot: c.rot, props: c.props })),
       wires: this.wires.map(w => ({ id: w.id, pts: w.pts.map(p => [p[0], p[1]]), color: w.color })),
     };
@@ -305,11 +308,13 @@ const app = {
       pts: Array.isArray(w.pts) && w.pts.length >= 2 ? w.pts.map(p => [p[0], p[1]]) : this.lPath(w.x1, w.y1, w.x2, w.y2, w.bend || 0),
     }));
     this.nextId = 1 + Math.max(0, ...this.comps.map(c => c.id || 0), ...this.wires.map(w => w.id || 0));
-    this.sel = null; this.resetSim(); this.dirty = true;
+    this.title = typeof data.title === 'string' ? data.title : '';
+    this.sel = null; this.mergeWires(); this.resetSim(); this.dirty = true;
     if (!keepHistory) this.changed();
     this.refreshProps();
   },
   changed() {
+    if (!this.drag || this.drag.kind === 'pan' || this.drag.kind === 'box') this.mergeWires();   // wire chains become one wire (same undo step)
     const s = JSON.stringify(this.serialize());
     if (this.history[this.hIdx] === s) return;
     this.history = this.history.slice(0, this.hIdx + 1); this.history.push(s);
@@ -322,8 +327,10 @@ const app = {
   restoreHist() {
     const t = this.t, running = this.running;
     const st = new Map(this.comps.map(c => [c.id, c.state]));
+    const S = this.selItems ? this.selItems() : { comps: [], wires: [] }, sc = new Set(S.comps.map(c => c.id)), sw = new Set(S.wires.map(w => w.id));
     this.load(this.history[this.hIdx], true);
     this.comps.forEach(c => { if (st.has(c.id)) c.state = st.get(c.id); });
+    if (this.setSelection && (sc.size || sw.size)) this.setSelection(this.comps.filter(c => sc.has(c.id)), this.wires.filter(w => sw.has(w.id)));
     this.t = t; this.hasRun = t > 0; this.running = running; this.updateRunBtn();
     try { localStorage.setItem(STORE_KEY, this.history[this.hIdx]); } catch (e) { /* ignore */ }
   },
@@ -642,6 +649,8 @@ const app = {
       }
       ctx.restore();
     }
+    if (this.sel && this.sel.multi) this.drawMultiSel(ctx, this.sel.comps, this.sel.wires, false);
+    if (this.drag && this.drag.kind === 'box' && this.drag.pick) this.drawMultiSel(ctx, this.drag.pick.comps, this.drag.pick.wires, true);
     if (this.sel && this.sel.comp) {
       const b = this.worldBox(this.sel.comp);
       ctx.strokeStyle = '#1e88e5'; ctx.lineWidth = 1.5 / v.s; ctx.setLineDash([5 / v.s, 4 / v.s]);
@@ -658,6 +667,7 @@ const app = {
       const g = { type: this.ghost.type, x: snap(this.ghost.x), y: snap(this.ghost.y), rot: 0, props: defaultProps(this.ghost.type), state: {}, _m: {} };
       ctx.save(); ctx.globalAlpha = 0.55; ctx.translate(g.x, g.y); DEFS[g.type].draw(ctx, g, env); ctx.restore();
     }
+    if (this.drag && this.drag.kind === 'box') this.drawBox(ctx, this.drag);
   },
   drawNodeTags(ctx) {
     const seen = new Set(), m = this.net;
@@ -718,7 +728,7 @@ const app = {
     const cv = this.conv, now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const cw = cv && cv.n && now - cv.at < 6000 ? _t('app.convergence_difficulty') + cv.n + _t('app.handled_automatically_continuing_wit') : '';
     const w = this.warn && this.warn !== _t('app.convergence_difficulty_continuing_wi') ? this.warn : cw;
-    $('#hud').innerHTML = running + ' &nbsp; t = ' + this.t.toFixed(3) + ' s' + (w ? _t('app.x460') + w + '</span>' : '') + (this.wireMode ? _t('app.wire_mode') : '');
+    $('#hud').innerHTML = running + ' &nbsp; t = ' + this.t.toFixed(3) + ' s' + (w ? _t('app.x460') + w + '</span>' : '') + (this.wireMode ? _t('app.wire_mode') : '') + (this.selectMode ? ' &nbsp;<span class="wm"><span class="ic-sel"></span> ' + _t('sel.mode_hud') + '</span>' : '');
     $('#status-stats').textContent = _t('app.parts_462') + this.comps.length + _t('app.wires') + this.wires.length + _t('app.nodes') + (this.nodeCount || 0) + _t('app.zoom') + Math.round(this.view.s * 100) + '%';
   },
   updateTooltip() {

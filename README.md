@@ -1,8 +1,8 @@
-# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v7
+# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v9
 
-**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 42 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar.
+**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 42 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar. **v9** adds box selection and group editing (move, rotate, copy/paste, delete), selection-only export with a file-name dialog, import as replace or merge, and automatic merging of wire chains.
 
-> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。
+> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。v9 新增：选择模式（框选多个器件、整体移动/旋转/复制粘贴/删除）、仅导出选中部分、导出时自定义文件名、导入时可选择替换或合并插入，以及首尾相连的导线自动合并。
 
 This is a self-contained circuit simulator that runs in the browser, inspired by DCACLab. It is written in plain HTML, CSS and JavaScript (classic `<script>` tags). There is no build step, no CDN and no network access. The whole UI is localised (see Languages below).
 
@@ -33,6 +33,50 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
   3. Add a `<script src="js/locales/<code>.js">` tag to `index.html`.
   4. Run `tests/test9.js`. It reports missing or extra keys.
 
+## Selection & group editing (v9) / 选择与整体编辑
+- **Select tool** (toolbar *Select* button, shortcut **V**): drag on empty canvas to draw a rubber band.
+  - Dragging **left→right** is a *window*: it picks the parts whose outline is fully inside and the wires whose every vertex is inside.
+  - Dragging **right→left** is a *crossing* (dashed green): it also picks anything the rectangle touches.
+  - Breadboards are only picked when fully enclosed, so you can box-select the parts sitting on a board.
+  - A plain click on empty space clears the selection.
+- **In normal mode:**
+  - Plain drag on empty space still pans.
+  - **Shift+drag** or **Ctrl+drag** box-selects (adding to the selection).
+  - **Ctrl/Cmd+click** (or Shift+click on a part) adds or removes an item.
+  - **Ctrl+A** selects all; **Esc** clears.
+  - **Pan** with the middle or right mouse button, or hold **Space** and drag (a Space tap still runs or pauses).
+  - **Touch:** long-press (≈0.45 s) then drag to box-select; a quick drag pans.
+- **Group actions** (each one is a single undo step):
+  - **Move:** drag any selected item and the whole group moves.
+    - Wires between selected parts move with them.
+    - Wires to unselected parts stretch (their far end stays put, keeping the path orthogonal) and stay connected.
+    - A selected breadboard carries every part plugged into it.
+    - The circuit's connectivity and readings are unchanged (tested).
+  - **Nudge:** arrow keys move the group 1 grid step; Shift+arrow moves 5.
+  - **Rotate:** **R** rotates the group 90° around its centre (snapped to the grid).
+  - **Copy/paste:** **Ctrl+C / Ctrl+V** copy and paste, **Ctrl+X** cuts, **Ctrl+D** duplicates.
+    - The copy includes every wire whose both ends are on copied parts, also through free junctions.
+    - The paste is offset and nudged so that no pin lands on an existing connection point; the pasted items become the selection.
+  - **Delete:** **Del** removes the selected items and any wires left dangling at both ends.
+- **Properties panel:** shows "N items selected" with the part/wire breakdown and the group buttons. When every selected part has the same type, a **bulk editor** changes a property on all of them at once.
+- **Export (⬇):** opens a dialog.
+  - **Scope:** *Whole circuit* or *Selection only*. The scope defaults to the selection when two or more items are selected.
+  - **Selection only:** saves the selected parts plus the wires whose both ends are on them, with positions shifted so the top-left corner is at the origin. The file has `"kind": "selection"`.
+  - **File name:** you type the file name; the default is the circuit title or `circuit-YYYYMMDD-HHMM`.
+    - Illegal characters `<>:"/\|?*` and control characters become `_`.
+    - Leading/trailing dots and spaces are trimmed, Windows reserved names get a `_`, the name is capped at 100 characters, and `.json` is appended once.
+    - A live preview shows the final name.
+  - **Title:** the name is stored as the circuit `title` (kept in saves, autosave and the exported JSON).
+- **Import (⬆):** into an empty canvas the file simply loads. Otherwise a dialog asks:
+  - **Replace circuit**, or
+  - **Merge / insert**: the file's parts are added at the view centre as a *selected group* that you can drag into place; selection exports default to this.
+- **Wire auto-merge:** a point that joins exactly two wire ends and nothing else (no terminal, no breadboard hole, no third wire) is not a real junction.
+  - The two wires become one polyline: the point turns into a bend, and collinear vertices are removed. The colour of the longer wire is kept.
+  - Merging runs with every edit (drawing, dragging ends/segments, deleting a part or wire, group moves, paste, import) as part of the same undo step, and when any circuit or old save is loaded.
+  - T-junctions (3+ wires) and points on terminals are never merged.
+  - Dropping a wire end on the middle of a wire still splits it into a junction; deleting that branch later re-merges the two halves.
+  - The topology is identical, so simulation results do not change.
+
 ## Components
 | Category | Parts |
 |---|---|
@@ -50,7 +94,7 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
 | Other 其他 | Breadboard (20, 30 or 40 columns); ground; wire |
 
 ## Usage
-- **Parts:** drag parts from the palette, or click one to drop it at the centre. R rotates, Del deletes, Ctrl+D duplicates, Ctrl+Z / Ctrl+Y undo and redo, Space runs or pauses.
+- **Parts:** drag parts from the palette, or click one to drop it at the centre. R rotates, Del deletes, Ctrl+D duplicates, Ctrl+Z / Ctrl+Y undo and redo, Space runs or pauses (hold Space and drag to pan). V toggles the Select tool, Ctrl+A / Ctrl+C / Ctrl+V / Ctrl+X work on the selection, and the arrow keys nudge it (see *Selection & group editing*).
 - **Wires:**
   - Drag from a gold terminal to draw a wire. Wires snap to terminals, wire ends, breadboard holes, points on other wires, and the grid.
   - **Junctions:** drop a wire end on the middle of another wire and that wire is split at a junction dot. **Shift+drag**, or drag in wire mode (W), from the body of a wire to start a branch from it.
@@ -223,6 +267,17 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
 
 ## Tests
 `tests/` contains the Playwright scripts used during development. They need `npm i playwright-core`, a Chrome at `/usr/bin/google-chrome`, and the folder served on port 8765. The older suites run the page with `locale: 'zh-CN'`.
+- `test10.js` runs **52 v9 checks**:
+  - box select with real mouse drags (window and crossing, compared against an independent rule), Shift+drag in normal mode, Ctrl+click add/remove for parts and wires, Ctrl+A, Esc, select-mode toggle with V;
+  - group drag: moved parts, unchanged connectivity partition and readings, one undo step; exact undo, redo;
+  - arrow nudge; group rotation keeps connectivity and readings;
+  - copy/paste with internal wires, not connected to the original; Ctrl+D; delete; undo of each in one step; a breadboard group carries its plugged parts;
+  - export dialog: the default scope, sanitised names with `.json`, selection JSON content and normalised positions, a whole-circuit export setting the title, Esc to cancel, sanitiser edge cases;
+  - re-import of the selection as merge (an isolated, selected, draggable group) and as replace; import into an empty canvas;
+  - wire auto-merge: a chain of 3 becomes 1 with the same readings, a T-junction stays 3, deleting its branch re-merges, no merge on a terminal, split by a mouse drop then re-merge after deleting the branch, an old v1 save normalising on load;
+  - Space+drag pan vs Space tap; touch long-press box select;
+  - all new keys in all 10 locales; no Chinese or raw keys in the new UI in en/de/ru/pt-BR (ja may use kanji).
+- `shots9.js` makes screenshots 48–51 (box select, group move, export dialog, wire auto-merge).
 - `test9.js` runs the **i18n checks** (87). It covers:
   - every locale has exactly the zh-CN key set, with no empty values and the same placeholders and tags; the fallback chain works;
   - for each locale: `?lang`, `<html lang>`, the title, the meta description and the dropdown;
@@ -231,6 +286,7 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - auto-detection from `navigator.languages`, persistence, `?lang` precedence, and rejection of an invalid `?lang`;
   - live switching keeps the circuit and the running simulation; saved JSON is language-independent; `file://` works.
 - `shots8.js` makes screenshots 44–47 (en, ja, es, and the language menu).
+- `test2.js` clicks through the v9 export dialog for its export check.
 - `test8.js` runs **62 v7 checks** (also with `SPARSE=1`). It covers:
   - the user's 7805 supply: 0 failed steps, 5 V, LED 20 mA, fuse intact, sane ripple; v6 settings reproduce the failure; the KCL check alone fixes it, and so does RELTOL alone;
   - a starved Newton solve recovers automatically; the warning toast, HUD and highlight; the advanced panel (edit, range rejection, reset, persistence);
@@ -290,3 +346,8 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - The stopped DC operating point uses t = 0 for time-varying sources, and treats logic, 555 and relay state as it currently is (initial state before a run).
   - AC ranges need a run to measure RMS.
   - Ω mode on a charged capacitor in a paused circuit ignores the stored charge (Ω is always a DC solve).
+- v9 selection and wires:
+  - When a group moves, wires to unselected parts are stretched by moving their end and the adjacent bend only. They are not re-routed around other parts, so after a long move a stretched wire may cross other parts; drag its segments to tidy it.
+  - Copy/paste uses an in-app clipboard (also kept in `localStorage`, so it works across tabs of the same browser), not the system clipboard.
+  - Parts selected while plugged into an *unselected* breadboard leave the board when moved, exactly as a single part does.
+  - Auto-merge only joins wire ends at free points; a wire end lying on the middle of another wire is still joined by splitting (as before), and wires that cross without an end are never connected.
