@@ -8,9 +8,24 @@ global.I18N = { add: (code, d) => { dicts[code] = Object.assign(dicts[code] || {
 for (const code of ['zh-CN', 'en']) {
   require(path.join(ROOT, 'js/locales', code + '.js'));
   require(path.join(ROOT, 'js/help', code + '.js'));
+  require(path.join(ROOT, 'js/i18n-v11', code + '.js'));
 }
+// v11: sensor parts — names / pins come from the component definitions (Chinese originals → dictionary keys)
+global.window = global; global.document = undefined;
 const D = require(path.join(ROOT, 'js/mcu-help.js'));
 const EX = require(path.join(ROOT, 'js/mcu-examples.js'));
+const SX = require(path.join(ROOT, 'js/sensor-examples.js'));
+// pin names of the sensor parts, read from the component sources without running the browser code
+const PINS = {};
+for (const f of ['js/sensors.js', 'js/lcdi2c.js']) {
+  const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+  for (const [t] of D.SENSORS) {
+    const m = src.match(new RegExp('\\n  ' + t + ': \\{[\\s\\S]*?termNames: (\\[[^\\]]*\\])')) || (t === 'lcdi2c' && f.endsWith('lcdi2c.js') && src.match(/termNames: (\[[^\]]*\])/));
+    if (m && !PINS[t]) PINS[t] = JSON.parse(m[1].replace(/'/g, '"'));
+  }
+}
+// parts built by the shared helpers in js/sensors.js use the helper's pin list
+for (const [t, how] of D.SENSORS) if (!PINS[t]) PINS[t] = how === 'ana_do' ? ['VCC', 'GND', 'DO', 'AO'] : (t === 'lm35' || t === 'tmp36') ? ['+Vs', 'Vout', 'GND'] : [];
 fs.mkdirSync(path.join(ROOT, 'docs'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'docs/pinout-uno.svg'), D.svg.arduino());
 fs.writeFileSync(path.join(ROOT, 'docs/pinout-attiny85.svg'), D.svg.attiny85());
@@ -30,7 +45,7 @@ function gen(code, file) {
   let o = '# ' + L.title + '\n\n> ' + L.gen + '  \n> ' + L.open + '  \n> [' + L.other + '](' + L.otherFile + ')\n\n';
   o += '## ' + L.toc + '\n\n';
   for (const b of D.BOARDS) o += '- [' + part(b) + '](#' + b + ')\n';
-  o += '- [' + t('help.nav.usage') + '](#usage)\n- [' + t('help.nav.examples') + '](#examples)\n\n';
+  o += '- [' + t('help.nav.usage') + '](#usage)\n- [' + t('help.nav.sensors') + '](#sensors)\n- [' + t('help.nav.examples') + '](#examples)\n\n';
   for (const b of D.BOARDS) {
     o += '<a id="' + b + '"></a>\n\n## ' + part(b) + '\n\n' + t('help.intro.' + b) + '\n\n';
     o += '### ' + t('help.nav.pinout') + '\n\n![' + part(b) + '](pinout-' + (b === 'arduino' ? 'uno' : 'attiny85') + '.svg)\n\n';
@@ -54,6 +69,19 @@ function gen(code, file) {
     for (let i = 1; i <= u.n; i++) o += t('help.u.' + u.id + '.' + i) + '\n\n';
     if (u.code) o += '```cpp\n' + u.code.join('\n') + '\n```\n\n';
     if (u.ex && u.ex.length) o += '*' + t('help.ex.examples') + ':* ' + u.ex.map((id) => '[' + t('ex.' + id) + '](#ex-' + id + ')').join(' · ') + '\n\n';
+  }
+  // v11 sensors
+  o += '<a id="sensors"></a>\n\n## ' + t('help.nav.sensors') + '\n\n' + t('help.s.intro') + '\n\n';
+  o += '| ' + t('help.s.th.part') + ' | ' + t('help.s.th.pins') + ' | ' + t('help.s.th.read') + ' |\n|---|---|---|\n';
+  for (const [ty, how] of D.SENSORS) o += '| **' + cell(part(ty)) + '** | ' + cell((PINS[ty] || []).join(' · ')) + ' | ' + cell(t('help.s.how.' + how)) + ' |\n';
+  o += '\n';
+  for (let i = 1; i <= D.SENS_TIPS; i++) o += '- ' + t('help.s.tip.' + i) + '\n';
+  o += '\n';
+  for (const id of Object.keys(SX)) {
+    const E = SX[id];
+    o += '<a id="ex-' + id + '"></a>\n\n### ' + t('ex.' + id) + '\n\n' + t('exd.' + id) + '\n\n';
+    o += '**' + t('help.ex.wiring') + '**\n\n' + E.wiring.map((w) => '- ' + wiring(w)).join('\n') + '\n\n';
+    o += '```cpp\n' + E.code.replace(/\s+$/, '') + '\n```\n\n';
   }
   o += '<a id="examples"></a>\n\n## ' + t('help.nav.examples') + '\n\n' + t('help.ex.intro') + '\n\n';
   for (const b of D.BOARDS) {

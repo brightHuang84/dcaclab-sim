@@ -407,7 +407,7 @@ Object.assign(app, {
     // bulk edit when every selected part has the same type
     if (types.size === 1 && comps.length > 1) {
       const d = DEFS[comps[0].type], c = comps[0];
-      const fields = d.props.filter(p => p.kind !== 'text' && p.kind !== 'code').map(p => this.propFieldHtml(p, c.props[p.k])).join('');
+      const fields = d.props.filter(p => p.kind !== 'text' && p.kind !== 'code' && (!p.show || p.show(c))).map(p => this.propFieldHtml(p, c.props[p.k])).join('');
       if (fields) h += '<div class="help bulk"><div class="rt">' + _t('sel.bulk', { n: comps.length, name: d.name }) + '</div>' + fields + '</div>';
     }
     if (wires.length) h += this.wireColorHtml(wires);
@@ -427,7 +427,9 @@ Object.assign(app, {
     const bulk = el.querySelector('.bulk'); if (!bulk || !comps.length) return;
     const d = DEFS[comps[0].type], pd = (k) => d.props.find(p => p.k === k);
     const setAll = (k, v) => { for (const c of comps) { c.props[k] = v; if (c.type !== 'scope') { c.state = { fuseBlown: c.state.fuseBlown }; c._m = {}; } if (d.onProp) d.onProp(c, k); } this.dirty = true; this.changed(); };
-    bulk.querySelectorAll('input[type=text]').forEach(inp => {
+    this.bindQty(bulk, d, comps);
+    bulk.querySelectorAll('.qty').forEach(f => { const r = f.querySelector('.qr'), n = f.querySelector('.qn'); if (r) { const o = r.oninput; r.oninput = () => { o(); for (const c of comps) if (c.type !== 'scope') c._m = {}; }; } });
+    bulk.querySelectorAll('input[type=text]:not(.qn)').forEach(inp => {
       const p = pd(inp.dataset.k);
       inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); };
       inp.onchange = () => {
@@ -436,7 +438,7 @@ Object.assign(app, {
         inp.classList.remove('bad'); setAll(p.k, v);
       };
     });
-    bulk.querySelectorAll('input[type=range]').forEach(inp => { inp.oninput = () => { for (const c of comps) c.props[inp.dataset.k] = parseFloat(inp.value); this.dirty = true; }; inp.onchange = () => this.changed(); });
+    bulk.querySelectorAll('input[type=range]:not(.qr)').forEach(inp => { inp.oninput = () => { for (const c of comps) c.props[inp.dataset.k] = parseFloat(inp.value); this.dirty = true; }; inp.onchange = () => this.changed(); });
     bulk.querySelectorAll('select').forEach(sel => { sel.onchange = () => { const p = pd(sel.dataset.k); setAll(p.k, p.num ? parseFloat(sel.value) : sel.value); this.refreshProps(); }; });
     bulk.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.onchange = () => setAll(cb.dataset.k, cb.checked); });
     bulk.querySelectorAll('.sw').forEach(b => { b.onclick = () => { setAll(b.dataset.k, b.dataset.v); this.refreshProps(); }; });

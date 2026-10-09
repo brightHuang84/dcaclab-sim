@@ -21,14 +21,16 @@ Object.assign(app, {
     }
     const c = s.comp, d = DEFS[c.type];
     let h = '<div class="ph"><canvas class="picon" width="56" height="40"></canvas><div class="pt">' + d.name + (I18N.isZh() ? ' <small>' + d.en + '</small>' : '') + '<div class="pid">' + (this.designators().get(c) || '') + ' · #' + c.id + '</div></div></div>';
+    if (d.desc) h += '<div class="pdesc">' + d.desc + '</div>';
     if (c.type === 'scope') h += '<canvas id="scope-big" width="226" height="170"></canvas>';
-    for (const p of d.props) h += this.propFieldHtml(p, c.props[p.k]);
+    for (const p of d.props) if (!p.show || p.show(c)) h += this.propFieldHtml(p, c.props[p.k]);
     const extra = [];
     if (c.type === 'switch') extra.push('<button id="p-toggle" class="primary">' + (c.props.closed ? _t('ui.open_switch') : _t('ui.close_switch')) + '</button>');
     if (c.type === 'fuse' && c.state.blown) extra.push(_t('ui.replace_fuse'));
     if (c.type === 'multimeter' && c.state.fuseBlown) extra.push(_t('ui.replace_meter_fuse'));
     if (c.state.burnt) extra.push(_t('ui.replace_with_new'));
     if (c.type === 'capacitor') extra.push(_t('ui.discharge'));
+    for (const a of d.acts || []) extra.push('<button class="p-act primary" data-a="' + a.k + '">' + a.label + '</button>');
     h += '<div class="btns">' + extra.join('') + _t('ui.rotate_r_duplicate_delete');
     h += '<div id="readings" class="readings"></div>';
     if (d.termNames) h += _t('ui.terminals') + d.termNames.join(' / ') + '</div>';
@@ -36,7 +38,9 @@ Object.assign(app, {
     el.innerHTML = h;
     this.drawThumb(el.querySelector('.picon'), c.type, c);
     el.querySelectorAll('input.tprop').forEach(inp => { inp.onchange = () => { c.props[inp.dataset.k] = inp.value.slice(0, 40); this.dirty = true; this.changed(); }; inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); }; });
-    el.querySelectorAll('input[type=text]:not(.tprop)').forEach(inp => {
+    this.bindQty(el, d, [c]);
+    el.querySelectorAll('.p-act').forEach(b => b.onclick = () => { d.act(c, b.dataset.a, this); this.dirty = true; this.updateReadings(true); });
+    el.querySelectorAll('input[type=text]:not(.tprop):not(.qn)').forEach(inp => {
       const pd = d.props.find(p => p.k === inp.dataset.k);
       inp.onchange = () => {
         const v = U.parseSI(inp.value);
@@ -46,16 +50,17 @@ Object.assign(app, {
       };
       inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
     });
-    el.querySelectorAll('input[type=range]').forEach(inp => {
+    el.querySelectorAll('input[type=range]:not(.qr)').forEach(inp => {
       inp.oninput = () => { c.props[inp.dataset.k] = parseFloat(inp.value); const pd = d.props.find(p => p.k === inp.dataset.k); inp.parentElement.querySelector('.rv').textContent = pd && pd.fmt ? pd.fmt(+inp.value) : Math.round(inp.value * 100) + '%'; this.dirty = true; };
       inp.onchange = () => this.changed();
     });
     el.querySelectorAll('select').forEach(sel => sel.onchange = () => {
       const pd = d.props.find(p => p.k === sel.dataset.k);
       c.props[sel.dataset.k] = pd.num ? parseFloat(sel.value) : sel.value;
-      if (c.type !== 'scope') { const keep = { fuseBlown: c.state.fuseBlown }; c.state = keep; c._m = {}; }
+      if (c.type !== 'scope') { const keep = { fuseBlown: c.state.fuseBlown }; for (const k of d.keepState || []) keep[k] = c.state[k]; c.state = keep; c._m = {}; }
       if (d.onProp) { d.onProp(c, sel.dataset.k); this.dirty = true; this.changed(); this.refreshProps(); return; }   // e.g. part-number presets
       this.dirty = true; this.changed();
+      if (pd.refresh) this.refreshProps();
     });
     el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => { c.props[cb.dataset.k] = cb.checked; this.dirty = true; this.changed(); this.refreshProps(); });
     el.querySelectorAll('.sw').forEach(b => b.onclick = () => { c.props[b.dataset.k] = b.dataset.v; this.dirty = true; this.changed(); this.refreshProps(); });
@@ -72,7 +77,36 @@ Object.assign(app, {
     this.updateReadings(true);
   },
   // one properties-panel field (also used by the bulk editor of a multi-selection)
+  // v11 quantity fields: slider (linear or logarithmic) + number box with units
+  qtyPos(p, v) {
+    v = +v;
+    if (p.log) { const lm = p.lmin || 1; if (v <= Math.max(p.min, 0) + 1e-12) return 0; return U.clamp(Math.round(1000 * Math.log(Math.max(v, lm) / lm) / Math.log(p.max / lm)), 1, 1000); }
+    return U.clamp(Math.round(1000 * (v - p.min) / (p.max - p.min)), 0, 1000);
+  },
+  qtyVal(p, pos) {
+    let v = p.log ? (pos <= 0 ? p.min : (p.lmin || 1) * Math.pow(p.max / (p.lmin || 1), pos / 1000)) : p.min + (p.max - p.min) * pos / 1000;
+    const st = p.step || 1; v = Math.round(v / st) * st;
+    return +U.clamp(v, p.min, p.max).toFixed(6);
+  },
+  qtyTxt(v) { return String(+(+v).toFixed(6)); },
+  bindQty(el, d, comps) {
+    const pd = (k) => d.props.find(p => p.k === k);
+    const set = (k, v) => { for (const c of comps) c.props[k] = v; this.dirty = true; };
+    el.querySelectorAll('.qty').forEach(f => {
+      const p = pd(f.dataset.k), r = f.querySelector('.qr'), n = f.querySelector('.qn'), lab = f.querySelector('.rv');
+      if (!p || !r || !n) return;
+      r.oninput = () => { const v = this.qtyVal(p, +r.value); set(p.k, v); n.value = this.qtyTxt(v); n.classList.remove('bad'); if (lab) lab.textContent = p.fmt(v); };
+      r.onchange = () => this.changed();
+      n.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') n.blur(); };
+      n.onchange = () => {
+        const v = U.parseSI(n.value.replace(',', '.'));
+        if (!isFinite(v) || v < p.min || v > p.max) { n.classList.add('bad'); this.toast(_t('ui.invalid_value') + n.value + _t('ui.range') + p.min + '…' + p.max + ')'); return; }
+        n.classList.remove('bad'); set(p.k, v); r.value = this.qtyPos(p, v); if (lab) lab.textContent = p.fmt(v); this.changed();
+      };
+    });
+  },
   propFieldHtml(p, v) {
+    if (p.kind === 'qty') return '<div class="field qty" data-k="' + p.k + '"><label>' + p.label + ' <span class="rv">' + p.fmt(+v) + '</span></label><div class="qrow"><input type="range" class="qr" min="0" max="1000" step="1" data-k="' + p.k + '" value="' + this.qtyPos(p, v) + '"><input type="text" class="qn" data-k="' + p.k + '" value="' + this.qtyTxt(v) + '"><span class="unit">' + (p.unit || '') + '</span></div></div>';
     if (p.kind === 'range') return '<div class="field"><label>' + p.label + ' <span class="rv">' + (p.fmt ? p.fmt(v) : Math.round(v * 100) + '%') + '</span></label><input type="range" min="0" max="1" step="0.01" data-k="' + p.k + '" value="' + v + '"></div>';
     else if (p.kind === 'select') return '<div class="field"><label>' + p.label + '</label><select data-k="' + p.k + '">' + p.opts.map(([val, lab]) => '<option value="' + val + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + lab + '</option>').join('') + '</select></div>';
     else if (p.kind === 'bool') return '<div class="field"><label class="chk"><input type="checkbox" data-k="' + p.k + '"' + (v ? ' checked' : '') + '> ' + p.label + '</label></div>';
@@ -238,10 +272,11 @@ Object.assign(app, {
   // ---------- palette ----------
   buildPalette() {
     const pal = $('#palette-body');
-    let h = '';
+    const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    let h = '<div class="pal-search"><input type="search" id="pal-q" autocomplete="off" placeholder="' + esc(_t('h.search_parts')) + '" value="' + esc(this.palQ || '') + '"></div><div id="pal-none" class="hint" hidden>' + _t('h.search_none') + '</div>';
     for (const [cat, title] of CATEGORIES) {
-      h += '<div class="cat"><div class="cat-t">' + title + '</div><div class="items">';
-      for (const [type, d] of Object.entries(DEFS)) if (d.cat === cat) h += '<div class="item" data-type="' + type + '" title="' + d.name + (I18N.isZh() ? ' ' + d.en : '') + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
+      h += '<div class="cat" data-cat="' + cat + '"><div class="cat-t">' + title + '</div><div class="items">';
+      for (const [type, d] of Object.entries(DEFS)) if (d.cat === cat) h += '<div class="item" data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
       if (cat === 'other') h += '<div class="item" data-type="__wire" title="' + _t('h.wire_item') + ' (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>' + _t('h.wire_item') + '</span>' + (I18N.isZh() ? '<small>Wire</small>' : '') + '</div>';
       h += '</div></div>';
     }
@@ -257,6 +292,19 @@ Object.assign(app, {
       this.drawThumb(cv, type);
       it.addEventListener('pointerdown', (e) => this.startPaletteDrag(e, type, cv));
     });
+    const q = $('#pal-q');
+    if (q) { q.oninput = () => this.filterPalette(q.value); q.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Escape') { q.value = ''; this.filterPalette(''); } }; this.filterPalette(q.value); }
+  },
+  // v11: palette search (name in the UI language, English name, type id, description, category)
+  filterPalette(q) {
+    this.palQ = q; const words = String(q || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+    let any = false;
+    document.querySelectorAll('#palette-body .cat').forEach(cat => {
+      let n = 0;
+      cat.querySelectorAll('.item').forEach(it => { const s = it.dataset.s || (it.dataset.type === '__wire' ? 'wire ' + _t('h.wire_item').toLowerCase() : ''); const ok = words.every(w => s.includes(w)); it.hidden = !ok; if (ok) n++; });
+      cat.hidden = !n; if (n) any = true;
+    });
+    const none = $('#pal-none'); if (none) none.hidden = any;
   },
   setWireMode(on) {
     this.wireMode = on;

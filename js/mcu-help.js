@@ -135,7 +135,7 @@ const MCU_HELP_DATA = (() => {
       '  myServo.write(90);  delay(1000);',
       '  myServo.write(180); delay(1000);',
       '}'] },
-    { id: 'lcd', n: 3, ex: ['ardlcd'], code: [
+    { id: 'lcd', n: 4, ex: ['ardlcd', 'snlcdi2c'], code: [
       '#include <LiquidCrystal.h>',
       'LiquidCrystal lcd(12, 11, 5, 4, 3, 2);   // RS, E, D4, D5, D6, D7',
       'void setup() {',
@@ -178,6 +178,14 @@ const MCU_HELP_DATA = (() => {
   ];
   const WIRE_TOKENS = ['anode', 'cathode', 'onboard_led', 'red_led', 'yellow_led', 'green_led', 'white_led', 'all_cathodes', 'internal_pullup', 'pot_ends', 'wiper',
     'gate', 'drain', 'source', 'flyback', 'common_gnd', 'servo_sig', 'servo_vcc', 'servo_gnd', 'backlight', 'contrast', 'pin_n4', 'pin_n5', 'pin_n6', 'pin_n8'];
+  // sensors section: part type → how a program reads it (help.s.how.<kind>)
+  const SENSORS = [
+    ['ldrmod', 'ana_do'], ['mqgas', 'ana_do'], ['flame', 'ana_do'], ['soil', 'ana_do'], ['rainmod', 'ana_do'], ['ntcmod', 'ana_do'], ['soundmod', 'ana_do'], ['tcrt5000', 'ana_do'],
+    ['waterlvl', 'ana'], ['lm35', 'ana'], ['tmp36', 'ana'], ['flex', 'ana'], ['fsr', 'ana'], ['joystick', 'ana'], ['acs712', 'ana'], ['pressure', 'ana'],
+    ['pir', 'dig'], ['irobst', 'dig'], ['tilt', 'dig'], ['sw420', 'dig'], ['ttp223', 'dig'], ['encoder', 'enc'],
+    ['hcsr04', 'pulse'], ['dht', 'dht'], ['ds18b20', 'ow'], ['lcdi2c', 'i2c']];
+  const SENS_HOW = ['ana_do', 'ana', 'dig', 'enc', 'pulse', 'dht', 'ow', 'i2c'];
+  const SENS_TIPS = 4;
   const CAT_COLORS = { dig: '#5b6b80', pwm: '#e8790c', ana: '#2f9e44', com: '#7b4bc4', int: '#d6336c', pwr: '#d62828', gnd: '#222222', spc: '#1971c2' };
   const CATS = ['dig', 'pwm', 'ana', 'com', 'int', 'pwr', 'gnd', 'spc'];
   const BOARDS = ['arduino', 'attiny85'];
@@ -282,7 +290,7 @@ const MCU_HELP_DATA = (() => {
     s += '</svg>';
     return s;
   }
-  return { TAGS, PINS, LIMITS, SIM_NO, USAGE, WIRE_TOKENS, CAT_COLORS, CATS, BOARDS, svg: { arduino: svgUno, attiny85: svgTiny } };
+  return { TAGS, PINS, LIMITS, SIM_NO, USAGE, WIRE_TOKENS, CAT_COLORS, CATS, BOARDS, SENSORS, SENS_HOW, SENS_TIPS, svg: { arduino: svgUno, attiny85: svgTiny } };
 })();
 if (typeof module !== 'undefined') module.exports = MCU_HELP_DATA;
 
@@ -301,6 +309,7 @@ const MCUHELP = (typeof document === 'undefined') ? null : (() => {
     const s = row.tags.map((t) => D.TAGS[t][1]);
     return s.every(Boolean) ? ['yes', '✓'] : s.some(Boolean) ? ['part', '◐'] : ['no', '✗'];
   };
+  const EXS = (id) => (typeof MCU_EX !== 'undefined' && MCU_EX[id]) || (typeof SENSOR_EX !== 'undefined' && SENSOR_EX[id]) || null;
   const exName = (id) => { const e = EXAMPLES.find((x) => x.id === id); return e ? e.name : id; };
 
   function html() {
@@ -308,7 +317,7 @@ const MCUHELP = (typeof document === 'undefined') ? null : (() => {
     let h = '<div class="mw-h pw-h"><span class="mw-title">📌 ' + esc(_t('help.title')) + '</span>' +
       D.BOARDS.map((x) => '<button class="pw-board' + (x === b ? ' on' : '') + '" data-b="' + x + '">' + esc(boardName(x)) + '</button>').join('') +
       '<button class="mw-x pw-x" title="' + esc(_t('mcu.close')) + '">✕</button></div>';
-    h += '<div class="pw-nav">' + ['pinout', 'table', 'limits', 'sim', 'usage', 'examples'].map((k) => '<a href="#" data-go="pw-' + k + '">' + esc(_t('help.nav.' + k)) + '</a>').join('') + '</div>';
+    h += '<div class="pw-nav">' + ['pinout', 'table', 'limits', 'sim', 'usage', 'sensors', 'examples'].map((k) => '<a href="#" data-go="pw-' + k + '">' + esc(_t('help.nav.' + k)) + '</a>').join('') + '</div>';
     h += '<div class="pw-body">';
     h += '<p class="pw-intro">' + fmt(_t('help.intro.' + b)) + '</p>';
     // pin map
@@ -344,6 +353,26 @@ const MCUHELP = (typeof document === 'undefined') ? null : (() => {
       if (u.ex && u.ex.length) h += '<div class="pw-rel">' + esc(_t('help.ex.examples')) + ': ' + u.ex.map((id) => '<a href="#" data-ex="' + id + '">' + esc(exName(id)) + '</a>').join(' · ') + '</div>';
       h += '</section>';
     }
+    // sensors: how to read each sensor part, tips, and the sensor example programs (all for the Arduino Uno)
+    h += '<h3 id="pw-sensors">' + esc(_t('help.nav.sensors')) + '</h3><p class="pw-intro">' + fmt(_t('help.s.intro')) + '</p>';
+    h += '<table class="pw-stab"><thead><tr><th>' + esc(_t('help.s.th.part')) + '</th><th>' + esc(_t('help.s.th.pins')) + '</th><th>' + esc(_t('help.s.th.read')) + '</th></tr></thead><tbody>';
+    for (const [t, how] of D.SENSORS) {
+      if (!DEFS[t]) continue;
+      h += '<tr><td><b>' + esc(partName(t)) + '</b></td><td class="pw-spins">' + esc((DEFS[t].termNames || []).join(' · ')) + '</td><td>' + fmt(_t('help.s.how.' + how)) + '</td></tr>';
+    }
+    h += '</tbody></table><ul class="pw-ul">';
+    for (let i = 1; i <= D.SENS_TIPS; i++) h += '<li>' + fmt(_t('help.s.tip.' + i)) + '</li>';
+    h += '</ul>';
+    if (typeof SENSOR_EX !== 'undefined') {
+      h += '<div class="pw-toc">' + Object.keys(SENSOR_EX).map((id) => '<a href="#" data-go="pw-s-' + id + '">' + esc(exName(id)) + '</a>').join('') + '</div>';
+      for (const id of Object.keys(SENSOR_EX)) {
+        const E = SENSOR_EX[id];
+        h += '<section class="pw-sx" id="pw-s-' + id + '" data-id="' + id + '"><h4>' + esc(exName(id)) + '</h4><p>' + fmt(_t('exd.' + id)) + '</p>';
+        h += '<div class="pw-sub">' + esc(_t('help.ex.wiring')) + '</div><ul class="pw-swire">' + E.wiring.map((w) => '<li>' + esc(wiringText(w)) + '</li>').join('') + '</ul>';
+        h += '<div class="pw-sub">' + esc(_t('help.ex.code')) + '</div><pre class="pw-code pw-scode">' + esc(E.code) + '</pre>';
+        h += '<div class="pw-btns"><button class="primary pw-sload" data-id="' + id + '">▶ ' + esc(_t('help.ex.load')) + '</button><button class="pw-sinsert" data-id="' + id + '">✎ ' + esc(_t('help.ex.insert')) + '</button><button class="pw-scopy" data-id="' + id + '">📋 ' + esc(_t('help.ex.copy')) + '</button></div></section>';
+      }
+    }
     // examples
     h += '<h3 id="pw-examples">' + esc(_t('help.nav.examples')) + '</h3><p class="pw-intro">' + fmt(_t('help.ex.intro')) + '</p>';
     const mine = Object.keys(MCU_EX).filter((id) => MCU_EX[id].board === b), others = Object.keys(MCU_EX).filter((id) => MCU_EX[id].board !== b);
@@ -362,14 +391,21 @@ const MCUHELP = (typeof document === 'undefined') ? null : (() => {
   function scrollTo(id) {
     const body = S.el.querySelector('.pw-body'), t = S.el.querySelector('#' + id); if (!body || !t) return;
     body.scrollTop += t.getBoundingClientRect().top - body.getBoundingClientRect().top - 6;
-    if (t.classList.contains('pw-ex')) { t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash'); }
+    if (t.classList.contains('pw-ex') || t.classList.contains('pw-sx')) { t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash'); }
   }
   function bind() {
     const el = S.el;
     el.querySelector('.pw-x').onclick = close;
     el.querySelectorAll('[data-b]').forEach((x) => x.onclick = (e) => { e.preventDefault(); S.board = x.dataset.b; render(); });
     el.querySelectorAll('[data-go]').forEach((a) => a.onclick = (e) => { e.preventDefault(); scrollTo(a.dataset.go); });
-    el.querySelectorAll('[data-ex]').forEach((a) => a.onclick = (e) => { e.preventDefault(); const id = a.dataset.ex; if (MCU_EX[id].board !== S.board) { S.board = MCU_EX[id].board; render(); } scrollTo('pw-ex-' + id); });
+    el.querySelectorAll('[data-ex]').forEach((a) => a.onclick = (e) => {
+      e.preventDefault(); const id = a.dataset.ex;
+      if (!MCU_EX[id]) { scrollTo('pw-s-' + id); return; }
+      if (MCU_EX[id].board !== S.board) { S.board = MCU_EX[id].board; render(); } scrollTo('pw-ex-' + id);
+    });
+    el.querySelectorAll('.pw-sload').forEach((x) => x.onclick = () => loadExample(x.dataset.id));
+    el.querySelectorAll('.pw-sinsert').forEach((x) => x.onclick = () => insertExample(x.dataset.id));
+    el.querySelectorAll('.pw-scopy').forEach((x) => x.onclick = () => copyExample(x.dataset.id));
     el.querySelectorAll('.pw-load').forEach((x) => x.onclick = () => loadExample(x.dataset.id));
     el.querySelectorAll('.pw-insert').forEach((x) => x.onclick = () => insertExample(x.dataset.id));
     el.querySelectorAll('.pw-copy').forEach((x) => x.onclick = () => copyExample(x.dataset.id));
@@ -446,17 +482,17 @@ const MCUHELP = (typeof document === 'undefined') ? null : (() => {
     return app.comps.find((x) => x.type === board) || app.comps.find((x) => DEFS[x.type].mcu) || null;
   }
   function insertExample(id) {
-    const E = MCU_EX[id]; const c = targetChip(E.board);
+    const E = EXS(id), board = E.board || 'arduino'; const c = targetChip(board);
     if (!c) { app.toast(_t('help.toast.no_chip')); return false; }
     MCU.openEditor(c);
     const W = MCU.W, ta = W.el.querySelector('.mw-code'), lang = W.el.querySelector('.mw-lang');
     ta.value = E.code; if (lang) lang.value = 'ino';
     ta.dispatchEvent(new Event('input')); ta.scrollTop = 0; ta.setSelectionRange(0, 0);
-    app.toast(c.type !== E.board ? _t('help.toast.mismatch', { board: boardName(E.board) }) : _t('help.toast.inserted', { chip: DEFS[c.type].name }));
+    app.toast(c.type !== board ? _t('help.toast.mismatch', { board: boardName(board) }) : _t('help.toast.inserted', { chip: DEFS[c.type].name }));
     return true;
   }
   function copyExample(id) {
-    const text = MCU_EX[id].code;
+    const text = EXS(id).code;
     const done = () => app.toast(_t('help.toast.copied'));
     const fallback = () => {
       try {

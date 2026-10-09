@@ -40,9 +40,11 @@ const I18N = (() => {
       if (typeof DEFS !== 'undefined') for (const [type, d] of Object.entries(DEFS)) {
         put(d, 'name', 'c.' + type + '.name');
         (d.termNames || []).forEach((n, i) => put(d.termNames, i, 'c.' + type + '.t' + i));
+        put(d, 'desc', 'c.' + type + '.desc');
+        (d.acts || []).forEach((a) => put(a, 'label', 'c.' + type + '.a.' + a.k));
         for (const p of d.props || []) {
-          put(p, 'label', 'c.' + type + '.p.' + p.k);
-          if (Array.isArray(p.opts)) p.opts.forEach((o) => { if (Array.isArray(o)) put(o, 1, 'c.' + type + '.o.' + p.k + '.' + o[0]); });
+          put(p, 'label', p.lk || 'c.' + type + '.p.' + p.k);   // lk: a key shared by many parts (signal-source fields …)
+          if (Array.isArray(p.opts)) p.opts.forEach((o) => { if (Array.isArray(o)) put(o, 1, (p.ok || 'c.' + type + '.o.' + p.k) + '.' + o[0]); });
           else if (p.opts && typeof p.opts === 'object') for (const [id, o] of Object.entries(p.opts)) put(o, 'name', 'c.' + type + '.o.' + p.k + '.' + id);
         }
       }

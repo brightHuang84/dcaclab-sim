@@ -16,8 +16,9 @@ const MCU = (() => {
   // ---------------------------------------------------------------- boards --------------------------------------
   const C16 = (v) => ({ v, ty: MCULANG.T.i16 });
   const COMMON_CONSTS = { HIGH: 1, LOW: 0, INPUT: 0, OUTPUT: 1, INPUT_PULLUP: 2, DEC: 10, HEX: 16, OCT: 8, BIN: 2, MSBFIRST: 1, LSBFIRST: 0,
-    CHANGE: 1, FALLING: 2, RISING: 3, DEFAULT: 1, INTERNAL: 3, EXTERNAL: 0, true: 1, false: 0, NULL: 0, SERIAL_8N1: 6, INT_MAX: 32767, INT_MIN: -32768 };
-  const FLOAT_CONSTS = { PI: Math.PI, HALF_PI: Math.PI / 2, TWO_PI: Math.PI * 2, DEG_TO_RAD: Math.PI / 180, RAD_TO_DEG: 180 / Math.PI, EULER: Math.E };
+    CHANGE: 1, FALLING: 2, RISING: 3, DEFAULT: 1, INTERNAL: 3, EXTERNAL: 0, true: 1, false: 0, NULL: 0, SERIAL_8N1: 6, INT_MAX: 32767, INT_MIN: -32768,
+    DHT11: 11, DHT22: 22, DHT21: 21, AM2301: 21, DEVICE_DISCONNECTED_C: -127 };
+  const FLOAT_CONSTS = { PI: Math.PI, HALF_PI: Math.PI / 2, TWO_PI: Math.PI * 2, DEG_TO_RAD: Math.PI / 180, RAD_TO_DEG: 180 / Math.PI, EULER: Math.E, DEVICE_DISCONNECTED_F: -196.6 };
   function mkConsts(extra) {
     const o = {};
     for (const [k, v] of Object.entries(COMMON_CONSTS)) o[k] = C16(v);
@@ -87,7 +88,8 @@ const MCU = (() => {
       this.fireAt(tc);
       if (this.gen && !this.err && solved && !this.pn && this.tp < t1) {
         if (this.tp < tc - 0.05) this.tp = tc;
-        this.lim = t1; this.ops = 0;
+        // v11: stop at the next timed sensor edge (e.g. HC-SR04 ECHO) so inputs are read at the exact simulated time
+        this.lim = this.app.nextDEdge ? Math.min(t1, this.app.nextDEdge(tc)) : t1; this.ops = 0;
         try { this.gen.next(); } catch (e) { this.fault(e); }
         this.fireAt(tc);
       }
@@ -435,14 +437,43 @@ const MCU = (() => {
           }
           return null;
         },
+        begun: false, warned: '',
+        // v11: no matching LCD → say which signal is wired where (toast once + board readings)
+        diag() {
+          const n = R.c._nodes, node = (k) => (k >= 0 ? n[R.B.term(k)] : -1);
+          const Ls = R.app.comps.filter((L) => L.type === 'lcd1602' && L._nodes);
+          if (!Ls.length) return _t(R.app.comps.some((L) => L.type === 'lcdi2c') ? 'mcu.lib.lcd_is_i2c' : 'mcu.lib.lcd_none');
+          const sig = [['RS', 3, rs], ['E', 5, en], ['D4', 10, data[0]], ['D5', 11, data[1]], ['D6', 12, data[2]], ['D7', 13, data[3]]];
+          let best = null, bs = -1;
+          for (const L of Ls) { const k = sig.filter(([, li, p]) => L._nodes[li] === node(p)).length; if (k > bs) { bs = k; best = L; } }
+          const bad = sig.filter(([, li, p]) => best._nodes[li] !== node(p)).map(([nm, li, p]) => _t('mcu.lib.lcd_pin', { sig: nm, want: p >= 0 ? R.B.names[p] : '?', got: R.netName(best._nodes[li]) }));
+          let msg = _t('mcu.lib.lcd_mismatch', { list: bad.join('; ') });
+          // where each signal really goes (a board pin index or -1), to recognise swapped / reversed data lines and suggest a fix
+          const at = sig.map(([, li]) => R.netPin(best._nodes[li]));
+          const want = data.map((p) => (p >= 0 ? R.B.names[p] : '?')).join(', '), got = at.slice(2).map((p) => (p >= 0 ? R.B.names[p] : '?')).join(', ');
+          const dw = data.join(','), dg = at.slice(2);
+          if (dg.every((p) => p >= 0) && dg.join(',') !== dw && [...dg].sort((x, y) => x - y).join(',') === [...data].sort((x, y) => x - y).join(',')) {
+            msg += ' ' + _t(dg.join(',') === [...data].reverse().join(',') ? 'mcu.lib.lcd_rev' : 'mcu.lib.lcd_perm', { want, got });
+          }
+          if (at.every((p) => p >= 0)) {
+            const num = (p) => { for (let k = 0; k < 40; k++) if (R.pin(k) === p) return k; return -1; };
+            const na = args.map((x) => x), ie = args.length === 6 || args.length === 10 ? 1 : 2;
+            na[0] = num(at[0]); na[ie] = num(at[1]); for (let i = 0; i < 4; i++) na[na.length - 4 + i] = num(at[2 + i]);
+            if (na.every((x) => x >= 0)) msg += ' ' + _t('mcu.lib.lcd_fix', { code: 'LiquidCrystal lcd(' + na.join(', ') + ');' });
+          }
+          return msg;
+        },
         mem() {
-          const L = o.find(); if (!L) { R.lcdMiss = true; return null; }
+          const L = o.find();
+          if (!L) { R.lcdMiss = true; R.libWarnT(o, o.diag()); return null; }
           R.lcdMiss = false;
           const st = L.state;
+          if (!o.begun) { R.libWarn(o, 'mcu.lib.lcd_nobegin', {}); return null; }   // like the real controller: nothing shown before lcd.begin()
           if (!st.dd) { st.dd = [new Array(40).fill(' '), new Array(40).fill(' ')]; st.ddOff = 0; st.ddOn = 1; }
+          if (st.init && DEFS.lcd1602.contrast(L) <= 0) R.libWarn(o, 'mcu.lib.lcd_contrast', {}); else if (o.warned) { o.warned = ''; R.libDiag = ''; }
           return st;
         },
-        begin() { R.tp += 0.05; for (const k of [rs, en, rw, ...data]) if (k >= 0) { R.modeP[k] = 1; R.outP[k] = 0; R.apply(k); } const st = o.mem(); if (st) { o.clr(st); st.ddOn = 1; } return 0; },
+        begin() { R.tp += 0.05; o.begun = true; for (const k of [rs, en, rw, ...data]) if (k >= 0) { R.modeP[k] = 1; R.outP[k] = 0; R.apply(k); } const st = o.mem(); if (st) { o.clr(st); st.ddOn = 1; } return 0; },
         clr(st) { st.dd[0].fill(' '); st.dd[1].fill(' '); st.ddOff = 0; o.x = 0; o.y = 0; },
         print(s) {
           s = String(s); const st = o.mem(); R.tp += s.length * 4e-5;
@@ -470,6 +501,196 @@ const MCU = (() => {
       };
       return o;
     }
+    // ---- v11 sensor libraries (library level: values come from the wired sensor part; the DATA line shows the
+    // protocol waveform for DHT; DS18B20 bus traffic is not drawn). Wiring / power problems give NaN / −127 + a toast.
+    libWarn(o, key, params) { this.libWarnT(o, _t(key, params)); }
+    libWarnT(o, txt) { this.libDiag = txt; if (o.warned === txt) return; o.warned = txt; if (this.app.toast) this.app.toast(txt); }
+    libOk(o) { if (o.warned && this.libDiag === o.warned) this.libDiag = ''; o.warned = ''; }
+    // what a node of the circuit is connected to, seen from this board: a pin name, GND / 5V, or "not connected"
+    netPin(nd) { const n = this.c._nodes, B = this.B; for (let p = 0; p < B.n; p++) if (n[B.term(p)] === nd) return p; return -1; }
+    netName(nd) {
+      const n = this.c._nodes, B = this.B;
+      for (let p = 0; p < B.n; p++) if (n[B.term(p)] === nd) return B.names[p];
+      if (nd === n[B.gnd]) return 'GND';
+      if (nd === n[B.vcc]) return 'VCC/5V';
+      const used = this.app.comps.reduce((a, c) => a + (c._nodes ? c._nodes.filter((x) => x === nd).length : 0), 0);
+      return used <= 1 ? _t('mcu.lib.unconnected') : _t('mcu.lib.other_net');
+    }
+    // ---- I2C (Wire, library level): devices answer when their SDA / SCL are on the board's I2C pins and powered
+    i2cPins() { return this.c.type === 'attiny85' ? [0, 2] : [18, 19]; }
+    i2cDevs() {
+      const n = this.c._nodes; if (!n) return [];
+      const [a, b] = this.i2cPins(), sda = n[this.B.term(a)], scl = n[this.B.term(b)], m = this.app.net;
+      return this.app.comps.filter((d) => d.type === 'lcdi2c' && d._nodes && d._nodes[2] === sda && d._nodes[3] === scl && d.state.init && m && m.v(d._nodes[1]) - m.v(d._nodes[0]) > 4.0);
+    }
+    wireI() { return this._w || (this._w = this.wire()); }
+    wire() {
+      const R = this; let addr = -1, nb = 0;
+      return {
+        begin() { R.tp += 1e-4; }, end() {}, setClock() {}, setWireTimeout() {},
+        beginTransmission(a) { addr = Math.trunc(+a) & 127; nb = 0; },
+        write(v) { nb++; return 1; },
+        endTransmission() { R.tp += (2 + nb) * 9e-5; const ok = R.i2cDevs().some((d) => +d.props.addr === addr); addr = -1; return ok ? 0 : 2; },
+      };
+    }
+    // ---- LiquidCrystal_I2C (PCF8574 backpack, 16×2)
+    lcdi2c(addr, cols, rows) {
+      const R = this; addr = Math.trunc(+addr) & 127;
+      const o = {
+        x: 0, y: 0, begun: false, warned: '', blOn: true,
+        diag() {
+          const all = R.app.comps.filter((d) => d.type === 'lcdi2c' && d._nodes);
+          const hex = (v) => '0x' + (+v).toString(16).toUpperCase();
+          if (!all.length) return _t(R.app.comps.some((d) => d.type === 'lcd1602') ? 'mcu.lib.i2c_is_parallel' : 'mcu.lib.i2c_none');
+          const n = R.c._nodes, [a, b] = R.i2cPins(), sda = n[R.B.term(a)], scl = n[R.B.term(b)], m = R.app.net;
+          const D = all[0];
+          if (D._nodes[2] === scl && D._nodes[3] === sda) return _t('mcu.lib.i2c_swapped', { sda: R.B.names[a], scl: R.B.names[b] });
+          const wired = all.filter((d) => d._nodes[2] === sda && d._nodes[3] === scl);
+          if (!wired.length) return _t('mcu.lib.i2c_pins', { sda: R.B.names[a], scl: R.B.names[b], gsda: R.netName(D._nodes[2]), gscl: R.netName(D._nodes[3]) });
+          const pw = wired.filter((d) => d.state.init && m.v(d._nodes[1]) - m.v(d._nodes[0]) > 4.0);
+          if (!pw.length) return _t('mcu.lib.i2c_power', { v: U.fmt(m.v(wired[0]._nodes[1]) - m.v(wired[0]._nodes[0]), 'V') });
+          if (Math.abs(m.v(wired[0]._nodes[0]) - m.v(n[R.B.gnd])) > 0.5) return _t('mcu.lib.i2c_gnd');
+          return _t('mcu.lib.i2c_addr', { want: hex(addr), got: pw.map((d) => hex(d.props.addr)).join(', ') });
+        },
+        find() { return R.i2cDevs().find((d) => +d.props.addr === addr) || null; },
+        mem() {
+          const L = o.find();
+          if (!L) { R.libWarnT(o, o.diag()); return null; }
+          const st = L.state;
+          if (!o.begun) { R.libWarn(o, 'mcu.lib.lcd_nobegin_i2c', {}); return null; }
+          if (!st.dd) { st.dd = [new Array(40).fill(' '), new Array(40).fill(' ')]; st.ddOff = 0; st.ddOn = 1; }
+          if (DEFS.lcdi2c.contrast(L) <= 0) R.libWarn(o, 'mcu.lib.lcdi2c_contrast', {}); else R.libOk(o);
+          return st;
+        },
+        init() { o.begin(); },
+        begin() { R.tp += 0.05; o.begun = true; o.x = 0; o.y = 0; const st = o.mem(); if (st) { o.clr(st); st.ddOn = 1; st.bl = o.blOn; } },
+        clr(st) { st.dd[0].fill(' '); st.dd[1].fill(' '); st.ddOff = 0; o.x = 0; o.y = 0; },
+        setBl(on) { o.blOn = on; R.tp += 2e-4; const L = o.find(); if (L) { if (L.state.bl !== on) R.app.net.needStamp = true; L.state.bl = on; } else o.mem(); },
+        print(s) {
+          s = String(s); R.tp += s.length * 5e-4;
+          const st = o.mem(); if (!st) return s.length;
+          for (const ch of s) {
+            const code = ch.charCodeAt(0);
+            st.dd[o.y][o.x] = code === 223 ? '°' : code < 8 ? '\u2588' : code < 32 || code > 255 ? ' ' : ch;
+            o.x++; if (o.x >= 40) { o.x = 0; o.y = 1 - o.y; }
+          }
+          return s.length;
+        },
+        setCursor(cx, cy) { R.tp += 5e-4; o.x = U.clamp(Math.trunc(cx), 0, 39); o.y = Math.trunc(cy) >= 1 ? 1 : 0; },
+        cmd(name) {
+          R.tp += name === 'clear' || name === 'home' ? 2.5e-3 : 5e-4;
+          if (name === 'backlight') return o.setBl(true);
+          if (name === 'noBacklight') return o.setBl(false);
+          const st = o.mem(); if (!st) return;
+          switch (name) {
+            case 'clear': o.clr(st); break;
+            case 'home': o.x = 0; o.y = 0; st.ddOff = 0; break;
+            case 'display': st.ddOn = 1; break; case 'noDisplay': st.ddOn = 0; break;
+            case 'scrollDisplayLeft': st.ddOff = (st.ddOff + 1) % 40; break;
+            case 'scrollDisplayRight': st.ddOff = (st.ddOff + 39) % 40; break;
+          }
+        },
+      };
+      return o;
+    }
+    sensOn(type, k, ti) {   // sensor parts of a type whose terminal ti shares the node of pin k
+      const n = this.c._nodes; if (!n || k < 0) return [];
+      const nd = n[this.B.term(k)];
+      return this.app.comps.filter((s) => s.type === type && s._nodes && s._nodes[ti] === nd).sort((a, b) => (a.id || 0) - (b.id || 0));
+    }
+    sensPow(s, iv, ig, vmin) {   // [ok, problem key]
+      const m = this.app.net, n = s._nodes, gm = m.v(this.c._nodes[this.B.gnd]);
+      if (Math.abs(m.v(n[ig]) - gm) > 0.5) return [false, 'nognd'];
+      if (m.v(n[iv]) - m.v(n[ig]) < vmin) return [false, 'nopower'];
+      return [true, ''];
+    }
+    dht(pin, type) {
+      const R = this, k = R.pin(pin), ty = Math.trunc(+type) || 11;
+      const o = {
+        last: -1e9, ok: false, T: NaN, H: NaN, warned: '',
+        begin() { if (k >= 0) { R.modeP[k] = 0; R.outP[k] = 1; R.apply(k); } o.last = -1e9; },
+        read(force) {
+          if (!force && R.tp - o.last < 2) return o.ok;   // the sensor may be read at most every 2 s; the last result is kept
+          o.last = R.tp;
+          const s = R.sensOn('dht', k, 1)[0];
+          if (!s) { R.libWarn(o, 'mcu.lib.dht_nowire', { pin: R.B.names[k] || pin }); o.ok = false; R.tp += 0.02; return false; }
+          const [pw, why] = R.sensPow(s, 0, 2, 3.0);
+          if (!pw) { R.libWarn(o, 'mcu.lib.dht_' + why, {}); o.ok = false; R.tp += 0.02; return false; }
+          o.warned = '';
+          // host start signal: LOW ≥ 18 ms (DHT11) / ≈1.1 ms (DHT22), then release (pull-up) and let the sensor answer
+          R.modeP[k] = 1; R.outP[k] = 0; R.pwmOff(k); R.apply(k);
+          R.tp += ty === 11 ? 0.018 : 0.0011;
+          R.modeP[k] = 0; R.outP[k] = 1; R.apply(k);
+          const e = DEFS.dht.encode(s, R.tp), b = e.b;
+          R.tp = DEFS.dht.respond(s, R.tp, b) + 1e-5;
+          if (((b[0] + b[1] + b[2] + b[3]) & 255) !== b[4]) { o.ok = false; return false; }
+          // decode as the requested type (a DHT11 read as DHT22 or vice versa gives wrong numbers, like the real library)
+          if (ty === 11) { o.H = b[0] + b[1] * 0.1; o.T = (b[2] + (b[3] & 15) * 0.1) * (b[3] & 128 ? -1 : 1); }
+          else { o.H = ((b[0] << 8) | b[1]) * 0.1; o.T = (((b[2] & 127) << 8) | b[3]) * 0.1 * (b[2] & 128 ? -1 : 1); }
+          o.ok = true; return true;
+        },
+        readTemperature(f, force) { if (!o.read(force)) return NaN; return f ? o.T * 1.8 + 32 : o.T; },
+        readHumidity(force) { if (!o.read(force)) return NaN; return o.H; },
+        convertCtoF: (c) => c * 1.8 + 32, convertFtoC: (f) => (f - 32) / 1.8,
+        // NWS heat index (Rothfusz regression with its published adjustments; simple formula below 80 °F)
+        computeHeatIndex(t, h, isF) {
+          if (isF === undefined) isF = 1;
+          const F = isF ? t : t * 1.8 + 32;
+          let hi = 0.5 * (F + 61 + (F - 68) * 1.2 + h * 0.094);
+          if ((hi + F) / 2 >= 80) {
+            hi = -42.379 + 2.04901523 * F + 10.14333127 * h - 0.22475541 * F * h - 0.00683783 * F * F - 0.05481717 * h * h + 0.00122874 * F * F * h + 0.00085282 * F * h * h - 0.00000199 * F * F * h * h;
+            if (h < 13 && F >= 80 && F <= 112) hi -= ((13 - h) / 4) * Math.sqrt((17 - Math.abs(F - 95)) / 17);
+            else if (h > 85 && F >= 80 && F <= 87) hi += ((h - 85) / 10) * ((87 - F) / 5);
+          }
+          return isF ? hi : (hi - 32) / 1.8;
+        },
+      };
+      return o;
+    }
+    ow(pin) { return { k: this.pin(pin), pin }; }
+    dallas(bus) {
+      const R = this, k = bus ? bus.k : -1;
+      const o = {
+        wait: true, warned: '', bits: 0,
+        devs() { return R.sensOn('ds18b20', k, 1); },
+        okDev(s) {
+          const [pw, why] = R.sensPow(s, 2, 0, 3.0);
+          if (!pw) { R.libWarn(o, 'mcu.lib.ds_' + why, {}); return false; }
+          const m = R.app.net, n = s._nodes, vd = m.v(n[2]) - m.v(n[0]), dq = m.v(n[1]) - m.v(n[0]);
+          if (R.modeP[k] !== 1 && dq < 0.7 * vd) { R.libWarn(o, 'mcu.lib.ds_nopullup', {}); return false; }
+          return true;
+        },
+        res(s) { return s.state.res || +s.props.res || 12; },
+        begin() { R.tp += 0.003; if (!o.devs().length) R.libWarn(o, 'mcu.lib.ds_nowire', { pin: R.B.names[k] || (bus && bus.pin) }); },
+        getDeviceCount() { R.tp += 0.003; return o.devs().filter((s) => o.okDev(s)).length; },
+        setResolution(b) { b = U.clamp(Math.trunc(+b) || 12, 9, 12); for (const s of o.devs()) s.state.res = b; R.tp += 0.003; },
+        getResolution() { const d = o.devs()[0]; return d ? o.res(d) : 0; },
+        setWaitForConversion(f) { o.wait = !!(+f); }, getWaitForConversion() { return o.wait; },
+        millisToWait(b) { return Math.round(DEFS.ds18b20.tconv(U.clamp(Math.trunc(+b) || 12, 9, 12)) * 1000); },
+        requestTemperatures(i) {
+          R.tp += 0.0015; let tw = 0;
+          const L = o.devs(), sel = i === undefined ? L : L.slice(Math.trunc(+i), Math.trunc(+i) + 1);
+          for (const s of sel) {
+            if (!o.okDev(s)) continue;
+            const b = o.res(s), tc = DEFS.ds18b20.tconv(b);
+            s.state.pend = { t: R.tp + tc, v: DEFS.ds18b20.quant(SENS.val(s, R.tp), b) }; tw = Math.max(tw, tc);
+          }
+          if (o.wait) R.tp += tw;
+          return i === undefined ? undefined : sel.length > 0;
+        },
+        upd(s) { const p = s.state.pend; if (p && R.tp >= p.t - 1e-9) { s.state.conv = p.v; s.state.pend = null; } },
+        isConversionComplete() { return o.devs().every((s) => !s.state.pend || R.tp >= s.state.pend.t - 1e-9); },
+        getTempCByIndex(i) {
+          R.tp += 0.005;
+          const s = o.devs()[Math.trunc(+i)];
+          if (!s) { if (!o.devs().length) R.libWarn(o, 'mcu.lib.ds_nowire', { pin: R.B.names[k] || (bus && bus.pin) }); return -127; }
+          if (!o.okDev(s)) return -127;
+          o.upd(s); return s.state.conv !== undefined ? s.state.conv : 85;   // 85 °C = power-on value of the scratchpad
+        },
+        getTempFByIndex(i) { const c = o.getTempCByIndex(i); return c === -127 ? -196.6 : c * 1.8 + 32; },
+      };
+      return o;
+    }
     // ---- JavaScript-mode API objects
     jsApi() {
       const R = this, B = this.B;
@@ -485,6 +706,11 @@ const MCU = (() => {
       };
       function Servo() { const s = R.servo(); s.writeMicroseconds = s.writeUs; s.readMicroseconds = s.readUs; return s; }
       function LiquidCrystal(...a) { const l = R.lcd(a); const o = { begin: (c, r) => l.begin(c, r), print: (v, f) => l.print(fmtJ(v, f)), write: (v) => l.print(typeof v === 'number' ? String.fromCharCode(v) : String(v)), setCursor: (x, y) => l.setCursor(x, y) }; for (const k of ['clear', 'home', 'display', 'noDisplay', 'cursor', 'noCursor', 'blink', 'noBlink', 'scrollDisplayLeft', 'scrollDisplayRight', 'autoscroll', 'noAutoscroll', 'leftToRight', 'rightToLeft']) o[k] = () => l.cmd(k); o.createChar = () => {}; return o; }
+      function DHT(p, t) { return R.dht(p, t); }
+      function LiquidCrystal_I2C(a, cc, rr) { const l = R.lcdi2c(a, cc, rr); const o = { init: () => l.init(), begin: () => l.begin(), print: (v, f) => l.print(fmtJ(v, f)), write: (v) => l.print(typeof v === 'number' ? String.fromCharCode(v) : String(v)), setCursor: (x, y) => l.setCursor(x, y), setBacklight: (v) => l.setBl(!!v) }; for (const k of ['clear', 'home', 'display', 'noDisplay', 'cursor', 'noCursor', 'blink', 'noBlink', 'scrollDisplayLeft', 'scrollDisplayRight', 'autoscroll', 'noAutoscroll', 'leftToRight', 'rightToLeft', 'backlight', 'noBacklight']) o[k] = () => l.cmd(k); o.createChar = () => {}; return o; }
+      const Wire = R.wireI();
+      function OneWire(p) { return R.ow(p); }
+      function DallasTemperature(b) { const d = R.dallas(b); d.requestTemperaturesByIndex = (i) => d.requestTemperatures(i); d.millisToWaitForConversion = d.millisToWait; return d; }
       const K = B.jsConsts;
       const api = {
         pinMode: (p, m) => R.pm(p, m), digitalWrite: (p, v) => R.dw(p, v), digitalRead: (p) => R.dr(p), analogRead: (p) => R.ar(p),
@@ -492,7 +718,7 @@ const MCU = (() => {
         millis: () => R.ms(), micros: () => R.us(), tone: (p, f, d) => R.tone(p, f, d), noTone: (p) => R.notone(p), pulseIn: (p, s, t) => R.pulseIn(p, s, t),
         shiftOut: (a, b, c, d) => R.shiftOut(a, b, c, d), shiftIn: (a, b, c) => R.shiftIn(a, b, c),
         map: (x, a, b, c, d) => R.map(x, a, b, c, d), constrain: (x, a, b) => R.cons(x, a, b), min: Math.min, max: Math.max, abs: Math.abs, sq: (x) => x * x,
-        random: (a, b) => R.rnd(a, b), randomSeed: (s) => R.seed(s), Serial, Servo, LiquidCrystal,
+        random: (a, b) => R.rnd(a, b), randomSeed: (s) => R.seed(s), Serial, Servo, LiquidCrystal, LiquidCrystal_I2C, Wire, DHT, OneWire, DallasTemperature, DHT11: 11, DHT22: 22, DHT21: 21, AM2301: 21, DEVICE_DISCONNECTED_C: -127, DEVICE_DISCONNECTED_F: -196.6,
         HIGH: 1, LOW: 0, INPUT: 0, OUTPUT: 1, INPUT_PULLUP: 2, LED_BUILTIN: K.LED_BUILTIN, DEC: 10, HEX: 16, OCT: 8, BIN: 2, PI: Math.PI, MSBFIRST: 1, LSBFIRST: 0,
         DEFAULT: 1, INTERNAL: 3, A0: K.A0, A1: K.A1, A2: K.A2, A3: K.A3, A4: K.A4, A5: K.A5, PB0: K.PB0, PB1: K.PB1, PB2: K.PB2, PB3: K.PB3, PB4: K.PB4, PB5: K.PB5,
         bitRead: (x, n) => (x >>> n) & 1, bit: (n) => (1 << n) >>> 0, lowByte: (x) => x & 255, highByte: (x) => (x >> 8) & 255,
@@ -526,7 +752,16 @@ const MCU = (() => {
       const [gh, gl] = pinG(d); pr[0].g = gh; pr[1].g = gl;
       app.net.needStamp = true;
       if (!app._edgeAt) app._edgeAt = new Map();
-      app._edgeAt.set(c._nodes[BOARDS[c.type].term(p)], t);
+      const nd = c._nodes[BOARDS[c.type].term(p)];
+      app._edgeAt.set(nd, t);
+      // v11: sensor inputs wired straight to this pin (HC-SR04 TRIG …) see the change at its exact time
+      const L = app._dlink && app._dlink.get(nd);
+      if (L) {
+        for (const [s, i] of L) DEFS[s.type].onDrive(s, i, d, t, app);
+        // an edge created inside the running program (e.g. ECHO after TRIG falls) must stop it in time
+        const te = app.nextDEdge(t);
+        for (const mc of app.mcuComps || []) { const rt = mc.state.rt; if (rt && te < rt.lim) rt.lim = te; }
+      }
     }
   }
   function pinG(d) {
@@ -610,6 +845,7 @@ const MCU = (() => {
     const r = [[_t('mcu.status'), _t('mcu.st.' + s)], ['VCC', U.fmt(M.Vcc || 0, 'V')], [_t('mcu.supply_current'), U.fmt(Math.abs(M.I || 0), 'A')]];
     if (rt && !rt.err) r.push([_t('mcu.uptime'), rt.upMs(app.t) + ' ms']);
     if (rt && rt.err) r.push([_t('mcu.error'), _t('mcu.line_n', { line: rt.err.line }) + ' ' + errText(rt.err)]);
+    if (rt && rt.libDiag) r.push([_t('mcu.lib.problem'), rt.libDiag]);
     r.push([_t('mcu.pins'), pinSummary(c)]);
     r.push([_t('mcu.serial_last'), lastLine(st.ser)]);
     if (Math.abs(M.Ipin || 0) > 0.04) r.push([_t('common.note'), _t('mcu.pin_overcurrent', { pin: BOARDS[c.type].names[M.Ipinp], i: U.fmt(Math.abs(M.Ipin), 'A') })]);

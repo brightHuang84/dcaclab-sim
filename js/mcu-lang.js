@@ -189,12 +189,13 @@ const MCULANG = (() => {
     i8: { k: 'int', b: 8, u: false }, u8: { k: 'int', b: 8, u: true }, i16: { k: 'int', b: 16, u: false }, u16: { k: 'int', b: 16, u: true },
     i32: { k: 'int', b: 32, u: false }, u32: { k: 'int', b: 32, u: true }, i64: { k: 'int', b: 64, u: false }, f: { k: 'float' },
     str: { k: 'str' }, servo: { k: 'obj', cls: 'Servo' }, lcd: { k: 'obj', cls: 'LiquidCrystal' },
+    dht: { k: 'obj', cls: 'DHT' }, ow: { k: 'obj', cls: 'OneWire' }, dallas: { k: 'obj', cls: 'DallasTemperature' }, lcdi2c: { k: 'obj', cls: 'LiquidCrystal_I2C' }, owp: { k: 'owp' },
   };
   const tyName = (t) => {
     if (!t) return '?';
     switch (t.k) {
       case 'int': return t.b === 64 ? 'long long' : (t.u ? 'unsigned ' : '') + (t.b === 8 ? 'char' : t.b === 16 ? 'int' : 'long');
-      case 'float': return 'float'; case 'str': return 'String'; case 'obj': return t.cls;
+      case 'float': return 'float'; case 'str': return 'String'; case 'obj': return t.cls; case 'owp': return 'OneWire*';
       case 'arr': return tyName(t.of) + '[]'.repeat(t.n);
       default: return t.k;
     }
@@ -213,7 +214,8 @@ const MCULANG = (() => {
     switch (t.k) { case 'bool': case 'char': return 1; case 'int': return t.b / 8; case 'float': return 4; case 'str': return 6; case 'obj': return 4; default: return 2; }
   };
   const BASEW = new Set(['void', 'bool', 'boolean', 'char', 'short', 'int', 'long', 'float', 'double', 'signed', 'unsigned', 'byte', 'word',
-    'String', 'size_t', 'uint8_t', 'int8_t', 'uint16_t', 'int16_t', 'uint32_t', 'int32_t', 'uint64_t', 'int64_t', 'Servo', 'LiquidCrystal']);
+    'String', 'size_t', 'uint8_t', 'int8_t', 'uint16_t', 'int16_t', 'uint32_t', 'int32_t', 'uint64_t', 'int64_t', 'Servo', 'LiquidCrystal', 'DHT', 'OneWire', 'DallasTemperature', 'LiquidCrystal_I2C']);
+  const OBJW = new Set(['Servo', 'LiquidCrystal', 'DHT', 'OneWire', 'DallasTemperature', 'LiquidCrystal_I2C']);   // library classes (no functional cast)
   const QUALW = new Set(['const', 'static', 'volatile', 'constexpr', 'inline', 'extern', 'register', 'unsigned', 'signed']);
   const UNSUP_KW = new Set(['struct', 'class', 'union', 'typedef', 'template', 'goto', 'namespace', 'using', 'new', 'delete', 'auto', 'operator', 'virtual', 'asm', 'try', 'throw']);
 
@@ -276,6 +278,10 @@ const MCULANG = (() => {
         case 'String': ty = T.str; break;
         case 'Servo': ty = T.servo; break;
         case 'LiquidCrystal': ty = T.lcd; break;
+        case 'DHT': ty = T.dht; break;
+        case 'OneWire': ty = T.ow; break;
+        case 'DallasTemperature': ty = T.dallas; break;
+        case 'LiquidCrystal_I2C': ty = T.lcdi2c; break;
         case 'enum': ty = T.i16; break;
         default:
           if (base === null && !(uns !== null || longs || short)) return null;
@@ -315,6 +321,7 @@ const MCULANG = (() => {
       if (t.t === 'op') {
         if (t.v === '++' || t.v === '--') { this.next(); return { k: 'pre', op: t.v, a: this.parseUnary(), line: t.line }; }
         if (t.v === '!' || t.v === '~' || t.v === '-' || t.v === '+') { this.next(); return { k: 'un', op: t.v, a: this.parseUnary(), line: t.line }; }
+        if (t.v === '&' && this.peek(1).t === 'id' && !this.isOp('(', 2) && !this.isOp('[', 2) && !this.isOp('.', 2)) { this.next(); const id = this.next(); return { k: 'addr', name: id.v, line: t.line }; }   // only &oneWire (checked by the emitter)
         if (t.v === '&' || t.v === '*') fail(t.line, 'unsupported', { what: t.v === '&' ? '&(address-of)' : '*(pointer)' });
         if (t.v === '(' && this.isTypeStart(1)) {
           this.next(); const s = this.typeSpec(); let ty = s.ty;
@@ -366,7 +373,7 @@ const MCULANG = (() => {
       if (t.t === 'chr') { this.next(); return { k: 'chr', v: t.v, line: t.line }; }
       if (t.t === 'id') {
         if (UNSUP_KW.has(t.v)) fail(t.line, 'unsupported', { what: t.v });
-        if ((BASEW.has(t.v) || t.v === 'unsigned') && t.v !== 'Servo' && t.v !== 'LiquidCrystal') {
+        if ((BASEW.has(t.v) || t.v === 'unsigned') && !OBJW.has(t.v)) {
           // functional cast: int(x), float(x), String(x [, HEX])
           const s = this.typeSpec();
           if (!s || !this.isOp('(')) fail(t.line, 'unexpected', { tok: t.v });
@@ -533,7 +540,7 @@ const MCULANG = (() => {
           case 'enum': fail(t.line, 'unsupported', { what: 'local enum' });
         }
         if (UNSUP_KW.has(t.v)) fail(t.line, 'unsupported', { what: t.v });
-        if (this.isTypeStart() && !(this.p.t === 'id' && (this.peek(1).v === '(' && BASEW.has(t.v) && t.v !== 'Servo' && t.v !== 'LiquidCrystal'))) {
+        if (this.isTypeStart() && !(this.p.t === 'id' && (this.peek(1).v === '(' && BASEW.has(t.v) && !OBJW.has(t.v)))) {
           const s = this.typeSpec();
           if (s.ty.k !== 'obj' && this.p.t === 'id' && this.isOp('(', 1)) fail(t.line, 'unsupported', { what: 'local function' });
           return this.declarators(s, false);
@@ -663,6 +670,7 @@ const MCULANG = (() => {
         case 'chr': return { c: String(e.v), ty: T.char, lit: e.v };
         case 'str': return { c: JSON.stringify(e.v), ty: T.str };
         case 'id': return this.exId(e);
+        case 'addr': { const v = this.exId({ k: 'id', name: e.name, line: e.line }); if (!(v.ty.k === 'obj' && v.ty.cls === 'OneWire')) fail(e.line, 'unsupported', { what: '&(address-of)' }); return { c: v.c, ty: T.owp }; }
         case 'comma': { const ps = e.list.map((x) => this.ex(x)); return { c: '(' + ps.map((p) => p.c).join(', ') + ')', ty: ps[ps.length - 1].ty }; }
         case 'cond': {
           const c = this.ex(e.c), a = this.ex(e.a), b = this.ex(e.b);
@@ -906,6 +914,20 @@ const MCULANG = (() => {
     exMethod(e) {
       const o = e.f.o, m = e.f.name; e.fname = m;
       const A = (lo, hi) => this.args(e, lo, hi === undefined ? lo : hi);
+      if (o.k === 'id' && o.name === 'Wire' && !this.look('Wire')) {
+        const N = (lo, hi) => this.numArgs(e, A(lo, hi));
+        switch (m) {
+          case 'begin': N(0, 1); return { c: '__R.wireI().begin()', ty: T.void };
+          case 'end': A(0); return { c: '0', ty: T.void };
+          case 'setClock': N(1); return { c: '0', ty: T.void };
+          case 'beginTransmission': return { c: `__R.wireI().beginTransmission(${N(1)})`, ty: T.void };
+          case 'write': { const vs = A(1, 2); return { c: `__R.wireI().write(${vs[0].c})`, ty: T.u8 }; }
+          case 'endTransmission': N(0, 1); return { c: '__R.wireI().endTransmission()', ty: T.u8 };
+          case 'requestFrom': case 'read': case 'available': case 'peek': case 'onReceive': case 'onRequest':
+            fail(e.line, 'unsupported', { what: 'Wire.' + m + '()' });
+        }
+        fail(e.line, 'unknown_member', { name: m, obj: 'Wire' });
+      }
       if (o.k === 'id' && o.name === 'Serial' && !this.look('Serial')) {
         switch (m) {
           case 'begin': A(1, 2); return { c: '__R.sb()', ty: T.void };
@@ -959,6 +981,52 @@ const MCULANG = (() => {
             A(0); return { c: `${ov.c}.cmd('${m}')`, ty: T.void };
         }
         fail(e.line, 'unknown_member', { name: m, obj: 'LiquidCrystal' });
+      }
+      if (ov.ty.k === 'obj' && ov.ty.cls === 'LiquidCrystal_I2C') {
+        switch (m) {
+          case 'init': A(0); return { c: `${ov.c}.init()`, ty: T.void };
+          case 'begin': this.numArgs(e, A(0, 3)); return { c: `${ov.c}.begin()`, ty: T.void };
+          case 'print': { const vs = A(1, 2); return { c: `${ov.c}.print(${this.fmt(vs[0], vs[1], e.line)})`, ty: T.u16 }; }
+          case 'write': { const v = A(1)[0]; return { c: `${ov.c}.print(${v.ty.k === 'str' || isCharArr(v.ty) ? this.toStr(v, e.line) : `String.fromCharCode(${v.c} & 255)`})`, ty: T.u16 }; }
+          case 'setCursor': return { c: `${ov.c}.setCursor(${this.numArgs(e, A(2)).join(', ')})`, ty: T.void };
+          case 'setBacklight': return { c: `${ov.c}.setBl(!!(${this.numArgs(e, A(1))}))`, ty: T.void };
+          case 'createChar': A(2); return { c: '0', ty: T.void };
+          case 'clear': case 'home': case 'display': case 'noDisplay': case 'cursor': case 'noCursor': case 'blink': case 'noBlink': case 'backlight': case 'noBacklight':
+          case 'scrollDisplayLeft': case 'scrollDisplayRight': case 'autoscroll': case 'noAutoscroll': case 'leftToRight': case 'rightToLeft':
+            A(0); return { c: `${ov.c}.cmd('${m}')`, ty: T.void };
+        }
+        fail(e.line, 'unknown_member', { name: m, obj: 'LiquidCrystal_I2C' });
+      }
+      if (ov.ty.k === 'obj' && ov.ty.cls === 'DHT') {
+        const N = (lo, hi) => this.numArgs(e, A(lo, hi));
+        switch (m) {
+          case 'begin': N(0, 1); return { c: `${ov.c}.begin()`, ty: T.void };
+          case 'read': return { c: `${ov.c}.read(${N(0, 1).join(', ')})`, ty: T.bool };
+          case 'readTemperature': return { c: `${ov.c}.readTemperature(${N(0, 2).join(', ')})`, ty: T.f };
+          case 'readHumidity': return { c: `${ov.c}.readHumidity(${N(0, 1).join(', ')})`, ty: T.f };
+          case 'computeHeatIndex': return { c: `${ov.c}.computeHeatIndex(${N(2, 3).join(', ')})`, ty: T.f };
+          case 'convertCtoF': return { c: `${ov.c}.convertCtoF(${N(1)})`, ty: T.f };
+          case 'convertFtoC': return { c: `${ov.c}.convertFtoC(${N(1)})`, ty: T.f };
+        }
+        fail(e.line, 'unknown_member', { name: m, obj: 'DHT' });
+      }
+      if (ov.ty.k === 'obj' && ov.ty.cls === 'DallasTemperature') {
+        const N = (lo, hi) => this.numArgs(e, A(lo, hi));
+        switch (m) {
+          case 'begin': A(0); return { c: `${ov.c}.begin()`, ty: T.void };
+          case 'getDeviceCount': A(0); return { c: `${ov.c}.getDeviceCount()`, ty: T.u8 };
+          case 'setResolution': return { c: `${ov.c}.setResolution(${N(1)})`, ty: T.void };
+          case 'getResolution': A(0); return { c: `${ov.c}.getResolution()`, ty: T.u8 };
+          case 'setWaitForConversion': return { c: `${ov.c}.setWaitForConversion(${N(1)})`, ty: T.void };
+          case 'getWaitForConversion': A(0); return { c: `${ov.c}.getWaitForConversion()`, ty: T.bool };
+          case 'requestTemperatures': A(0); return { c: `${ov.c}.requestTemperatures()`, ty: T.void };
+          case 'requestTemperaturesByIndex': return { c: `${ov.c}.requestTemperatures(${N(1)})`, ty: T.bool };
+          case 'isConversionComplete': A(0); return { c: `${ov.c}.isConversionComplete()`, ty: T.bool };
+          case 'millisToWaitForConversion': return { c: `${ov.c}.millisToWait(${N(1)})`, ty: T.i16 };
+          case 'getTempCByIndex': return { c: `${ov.c}.getTempCByIndex(${N(1)})`, ty: T.f };
+          case 'getTempFByIndex': return { c: `${ov.c}.getTempFByIndex(${N(1)})`, ty: T.f };
+        }
+        fail(e.line, 'unknown_member', { name: m, obj: 'DallasTemperature' });
       }
       fail(e.line, 'unknown_member', { name: m, obj: tyName(ov.ty) });
     }
@@ -1095,7 +1163,13 @@ const MCULANG = (() => {
           const as = (v.ctor || []).map((a) => this.ex(a).c);
           if (v.init) fail(v.line, 'unsupported', { what: tyName(ty) + ' =' });
           if (ty.cls === 'LiquidCrystal' && as.length !== 6 && as.length !== 7 && as.length !== 10 && as.length !== 11) fail(v.line, 'args', { name: 'LiquidCrystal', n: '6/7/10/11' });
-          code = ty.cls === 'Servo' ? '__R.servo()' : `__R.lcd([${as.join(', ')}])`;
+          const cv = (v.ctor || []).map((a) => this.ex(a));
+          if (ty.cls === 'LiquidCrystal_I2C' && as.length !== 3 && as.length !== 4) fail(v.line, 'args', { name: 'LiquidCrystal_I2C', n: '3' });
+          if (ty.cls === 'DHT' && as.length !== 2 && as.length !== 3) fail(v.line, 'args', { name: 'DHT', n: '2' });
+          if (ty.cls === 'OneWire' && as.length !== 1) fail(v.line, 'args', { name: 'OneWire', n: 1 });
+          if (ty.cls === 'DallasTemperature' && (as.length !== 1 || cv[0].ty.k !== 'owp')) fail(v.line, 'args', { name: 'DallasTemperature', n: '&OneWire' });
+          if ((ty.cls === 'DHT' || ty.cls === 'OneWire') && cv.some((x) => !isNum(x.ty))) fail(v.line, 'type_mismatch', { from: tyName(cv.find((x) => !isNum(x.ty)).ty), to: 'number' });
+          code = ty.cls === 'Servo' ? '__R.servo()' : ty.cls === 'DHT' ? `__R.dht(${as[0]}, ${as[1]})` : ty.cls === 'OneWire' ? `__R.ow(${as[0]})` : ty.cls === 'DallasTemperature' ? `__R.dallas(${as[0]})` : ty.cls === 'LiquidCrystal_I2C' ? `__R.lcdi2c(${as[0]}, ${as[1]}, ${as[2]})` : `__R.lcd([${as.join(', ')}])`;
         } else {
           if (ty.k === 'void') fail(v.line, 'type_mismatch', { from: 'void', to: v.name });
           if (v.ctor) { if (v.ctor.length !== 1) fail(v.line, 'args', { name: v.name, n: 1 }); v.init = v.ctor[0]; }
@@ -1305,13 +1379,13 @@ const MCULANG = (() => {
     'indexedDB', 'navigator', 'Function', 'importScripts', 'setTimeout', 'setInterval', 'requestAnimationFrame', 'alert', 'confirm', 'prompt',
     'open', 'close', 'parent', 'top', 'frames', 'opener', 'history', 'app', 'DEFS', 'I18N', 'MCULANG', 'MCU', 'EXAMPLES', 'UI', 'U', 'D'];
   const JS_API = ['pinMode', 'digitalWrite', 'digitalRead', 'analogRead', 'analogWrite', 'analogReference', 'delay', 'delayMicroseconds', 'millis', 'micros',
-    'tone', 'noTone', 'pulseIn', 'shiftOut', 'shiftIn', 'map', 'constrain', 'min', 'max', 'abs', 'sq', 'random', 'randomSeed', 'Serial', 'Servo', 'LiquidCrystal',
+    'tone', 'noTone', 'pulseIn', 'shiftOut', 'shiftIn', 'map', 'constrain', 'min', 'max', 'abs', 'sq', 'random', 'randomSeed', 'Serial', 'Servo', 'LiquidCrystal', 'LiquidCrystal_I2C', 'Wire', 'DHT', 'OneWire', 'DallasTemperature', 'DHT11', 'DHT22', 'DHT21', 'AM2301', 'DEVICE_DISCONNECTED_C', 'DEVICE_DISCONNECTED_F',
     'HIGH', 'LOW', 'INPUT', 'OUTPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'DEC', 'HEX', 'OCT', 'BIN', 'PI', 'MSBFIRST', 'LSBFIRST', 'DEFAULT', 'INTERNAL',
     'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'PB0', 'PB1', 'PB2', 'PB3', 'PB4', 'PB5', 'bitRead', 'bit', 'lowByte', 'highByte'];
   const JS_HEADER_LINES = 3;   // `function anonymous(...\n) {\n"use strict";\n` precede user line 1
 
   // ------------------------------------------------------------------ public entry --------------------------------
-  const KNOWN_INC = new Set(['arduino.h', 'servo.h', 'liquidcrystal.h', 'avr/io.h', 'avr/pgmspace.h', 'math.h', 'stdlib.h', 'string.h', 'stdint.h', 'stdio.h', 'util/delay.h']);
+  const KNOWN_INC = new Set(['arduino.h', 'servo.h', 'liquidcrystal.h', 'avr/io.h', 'dht.h', 'onewire.h', 'dallastemperature.h', 'wire.h', 'liquidcrystal_i2c.h', 'avr/pgmspace.h', 'math.h', 'stdlib.h', 'string.h', 'stdint.h', 'stdio.h', 'util/delay.h']);
   const cache = new Map();
   function compile(src, lang, consts) {
     const key = lang + '\u0000' + JSON.stringify(Object.keys(consts || {}).length) + '\u0000' + src;
