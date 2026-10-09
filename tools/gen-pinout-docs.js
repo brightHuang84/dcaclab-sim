@@ -9,12 +9,20 @@ for (const code of ['zh-CN', 'en']) {
   require(path.join(ROOT, 'js/locales', code + '.js'));
   require(path.join(ROOT, 'js/help', code + '.js'));
   require(path.join(ROOT, 'js/i18n-v11', code + '.js'));
+  require(path.join(ROOT, 'js/i18n-v12', code + '.js'));
 }
 // v11: sensor parts — names / pins come from the component definitions (Chinese originals → dictionary keys)
 global.window = global; global.document = undefined;
 const D = require(path.join(ROOT, 'js/mcu-help.js'));
 const EX = require(path.join(ROOT, 'js/mcu-examples.js'));
 const SX = require(path.join(ROOT, 'js/sensor-examples.js'));
+// v12: the extra boards' default (Blink) programs live in the part definitions → load the MCU runtime + js/boards.js
+// with a few browser globals stubbed (no drawing happens at load time)
+global.DEFS = {}; global.CATEGORIES = [];
+const ldScript = (f, tail) => (0, eval)(fs.readFileSync(path.join(ROOT, f), 'utf8') + (tail || ''));
+ldScript('js/mcu-lang.js', ';global.MCULANG = MCULANG;'); ldScript('js/mcu.js', ';global.MCU = MCU;'); ldScript('js/boards.js');
+const BX = require(path.join(ROOT, 'js/board-examples.js'));
+const svgFile = (b) => 'pinout-' + (b === 'arduino' ? 'uno' : b) + '.svg';
 // pin names of the sensor parts, read from the component sources without running the browser code
 const PINS = {};
 for (const f of ['js/sensors.js', 'js/lcdi2c.js']) {
@@ -27,8 +35,7 @@ for (const f of ['js/sensors.js', 'js/lcdi2c.js']) {
 // parts built by the shared helpers in js/sensors.js use the helper's pin list
 for (const [t, how] of D.SENSORS) if (!PINS[t]) PINS[t] = how === 'ana_do' ? ['VCC', 'GND', 'DO', 'AO'] : (t === 'lm35' || t === 'tmp36') ? ['+Vs', 'Vout', 'GND'] : [];
 fs.mkdirSync(path.join(ROOT, 'docs'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'docs/pinout-uno.svg'), D.svg.arduino());
-fs.writeFileSync(path.join(ROOT, 'docs/pinout-attiny85.svg'), D.svg.attiny85());
+for (const b of D.BOARDS) fs.writeFileSync(path.join(ROOT, 'docs', svgFile(b)), D.svg[b]());
 
 const LABEL = {
   'zh-CN': { title: '单片机引脚说明、常规用法与示例', gen: '本文件由 `tools/gen-pinout-docs.js` 根据程序内「引脚说明」面板的同一份数据生成，内容与面板一致。', other: 'English version', otherFile: 'pinout-en.md', port: '端口 / 数据手册名称', toc: '目录', snippet: '示例代码', open: '在程序中：选中开发板或芯片 → 属性面板或程序编辑器工具栏中的「📌 引脚说明」；示例也在顶部「示例电路」菜单中。' },
@@ -48,7 +55,7 @@ function gen(code, file) {
   o += '- [' + t('help.nav.usage') + '](#usage)\n- [' + t('help.nav.sensors') + '](#sensors)\n- [' + t('help.nav.examples') + '](#examples)\n\n';
   for (const b of D.BOARDS) {
     o += '<a id="' + b + '"></a>\n\n## ' + part(b) + '\n\n' + t('help.intro.' + b) + '\n\n';
-    o += '### ' + t('help.nav.pinout') + '\n\n![' + part(b) + '](pinout-' + (b === 'arduino' ? 'uno' : 'attiny85') + '.svg)\n\n';
+    o += '### ' + t('help.nav.pinout') + '\n\n![' + part(b) + '](' + svgFile(b) + ')\n\n';
     o += D.CATS.map((c) => '`' + t('help.cat.' + c) + '`').join(' · ') + ' — ' + t('help.leg.nosim') + '\n\n';
     o += '### ' + t('help.nav.table') + '\n\n| ' + t('help.th.pin') + ' | ' + L.port + ' | ' + t('help.th.func') + ' | ' + t('help.th.sim') + ' |\n|---|---|---|---|\n';
     let prev = null;
@@ -57,9 +64,16 @@ function gen(code, file) {
       const tags = r.tags.map((x) => (D.TAGS[x][1] && !r.absent ? '' : '~~') + t('help.tag.' + x) + (D.TAGS[x][1] && !r.absent ? '' : '~~')).join(', ');
       o += '| **' + cell(r.p) + '** | ' + cell(r.port || '') + ' | ' + cell(tags + (showNote ? '<br>' + t('help.note.' + r.note) : '')) + ' | ' + simState(r) + ' |\n';
     }
-    o += '\n~~' + t('help.tag.' + (b === 'arduino' ? 'int0' : 'xtal')) + '~~ = ' + t('help.sim.no') + '\n\n### ' + t('help.nav.limits') + '\n\n';
+    const legend = b === 'arduino' ? 'int0' : b === 'attiny85' ? 'xtal' : (D.PINS[b].map((r) => r.tags.find((x) => !D.TAGS[x][1] || r.absent)).find(Boolean));
+    o += '\n' + (legend ? '~~' + t('help.tag.' + legend) + '~~ = ' + t('help.sim.no') + '\n\n' : '') + '### ' + t('help.nav.limits') + '\n\n';
     for (let i = 1; i <= D.LIMITS[b]; i++) o += '- ' + t('help.lim.' + b + '.' + i) + '\n';
     o += '\n';
+    if (D.SIMB[b]) {   // v12 boards: their own "what the simulator does not do" list
+      o += '### ' + t('help.nav.sim') + '\n\n';
+      for (const i of (D.SIMG[b] || D.SIM_GENERIC)) o += '- ✗ ' + t('help.sim.no.' + i) + '\n';
+      for (let i = 1; i <= D.SIMB[b]; i++) o += '- ✗ ' + t('help.simb.' + b + '.' + i) + '\n';
+      o += '\n';
+    }
   }
   o += '## ' + t('help.nav.sim') + '\n\n✓ ' + t('help.sim.ok') + '\n\n';
   for (let i = 1; i <= D.SIM_NO; i++) o += '- ✗ ' + t('help.sim.no.' + i) + '\n';
@@ -86,8 +100,9 @@ function gen(code, file) {
   o += '<a id="examples"></a>\n\n## ' + t('help.nav.examples') + '\n\n' + t('help.ex.intro') + '\n\n';
   for (const b of D.BOARDS) {
     o += '### ' + part(b) + '\n\n';
-    for (const id of Object.keys(EX).filter((x) => EX[x].board === b)) {
-      const E = EX[id];
+    const ALL = Object.assign({}, EX, BX);
+    for (const id of Object.keys(ALL).filter((x) => ALL[x].board === b)) {
+      const E = ALL[id];
       o += '<a id="ex-' + id + '"></a>\n\n#### ' + t('ex.' + id) + '\n\n' + t('exd.' + id) + '\n\n';
       o += '**' + t('help.ex.wiring') + '**\n\n' + E.wiring.map((w) => '- ' + wiring(w)).join('\n') + '\n\n';
       o += '**' + t('help.ex.usage') + ':** ' + E.usage.map((u) => t('help.u.' + u + '.t')).join(' · ') + '\n\n';

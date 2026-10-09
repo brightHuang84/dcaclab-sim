@@ -8,6 +8,13 @@
 
 - [Arduino Uno 开发板](#arduino)
 - [ATtiny85 单片机 (8 脚)](#attiny85)
+- [Arduino Nano 开发板](#nano)
+- [Arduino Mega 2560 开发板](#mega)
+- [Arduino Pro Mini 开发板](#promini)
+- [ESP32 开发板 (DevKit V1 30 针)](#esp32)
+- [树莓派 Pico 开发板](#pico)
+- [STM32 蓝色小板 Blue Pill (F103C8)](#bluepill)
+- [8051 单片机 (STC89C52 / AT89C52, 40 脚)](#c51)
 - [常规用法](#usage)
 - [传感器](#sensors)
 - [示例](#examples)
@@ -106,6 +113,348 @@ ATtiny85（8 脚 DIP，AVR 8 位）：5 个通用 IO PB0–PB4，另有 PB5（�
 - ADC：10 位，4 路单端输入 ADC0–ADC3 = PB5 / PB2 / PB4 / PB3；参考电压可选 VCC、内部 1.1 V、内部 2.56 V 或 PB0 上的外部 AREF。
 - 存储：Flash 8 KB、SRAM 512 B、EEPROM 512 B。
 - 时钟：出厂为内部 8 MHz RC ÷ 8 = 1 MHz（CKDIV8 熔丝）；可改为内部 8 MHz、PLL 16 MHz，或外部晶振（占用 PB3/PB4）。
+
+<a id="nano"></a>
+
+## Arduino Nano 开发板
+
+Arduino Nano（ATmega328P，16 MHz，5 V 逻辑）：和 Uno 同一颗芯片，做成可插面包板的小板。D0–D13（6 个带 ~ 的 PWM 脚），A0–A7（10 位 ADC，A6/A7 只能作模拟输入），Mini-USB 接口，VIN 接 7–12 V。
+
+### 引脚图
+
+![Arduino Nano 开发板](pinout-nano.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **D0 / D1** | PD0 · RXD / PD1 · TXD | 数字输入/输出, ~~串口接收 RX~~, ~~串口发送 TX~~<br>D0/D1 与板上的 USB 转串口芯片相连：上传程序和 `Serial` 通信都要用它们，外接电路可能导致上传失败。仿真中 D0/D1 可当普通 IO，`Serial` 直接连到串口监视器。 | ◐ 部分支持 |
+| **D2, D4, D7, D8, D12** | PD2 · PD4 · PD7 · PB0 · PB4 | 数字输入/输出 | ✓ 支持 |
+| **D3, D9, D10, D11 ~** | OC2B · OC1A · OC1B · OC2A | 数字输入/输出, PWM 约 490 Hz<br>`tone()` 占用 Timer2，发声期间 D3 和 D11 的 PWM 失效。 | ✓ 支持 |
+| **D5, D6 ~** | OC0B · OC0A | 数字输入/输出, PWM 约 980 Hz | ✓ 支持 |
+| **D13** | PB5 · SCK | 数字输入/输出, ~~SPI 时钟 SCK~~, 板载 LED「L」<br>板载 LED“L”经电阻接在 D13 上：D13 为高电平时就亮，D13 作输入时它也是一个负载。 | ◐ 部分支持 |
+| **A0–A5 (D14–D19)** | PC0–PC5 · ADC0–ADC5 | 模拟输入（10 位 ADC）, 数字输入/输出<br>A4/A5 同时是 I²C 的 SDA/SCL（Wire）。A0–A5 也可作数字脚 D14–D19。 | ✓ 支持 |
+| **A6, A7** | ADC6 · ADC7 | 模拟输入（10 位 ADC）<br>A6、A7（ADC6/ADC7 只有贴片 TQFP/QFN 封装才有）只连到 ADC：`analogRead(A6)` 可以，`pinMode`、`digitalRead`、`digitalWrite` 都不行——仿真器会报错。 | ✓ 支持 |
+| **5V** |  | 5 V 电源<br>5 V 电源轨：来自 USB（经肖特基二极管）或由 VIN 经板载稳压器得到。也可以直接从这里输入稳压的 5 V（绕过稳压器）。 | ✓ 支持 |
+| **3V3** |  | 3.3 V 电源输出<br>3.3 V 输出；原版 Nano 由 USB 转串口芯片（FT232RL）提供，只能输出约 50 mA 的小电流。 | ✓ 支持 |
+| **VIN** |  | 外部电源输入 VIN<br>外部电源输入（DC 插座经二极管接到这里），推荐 7–12 V，极限 6–20 V。低于 7 V 时 5 V 可能不稳，高于 12 V 稳压器容易过热。 | ✓ 支持 |
+| **GND ×2** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **RST ×2 · AREF** | PC6 · AREF | ~~复位（低电平有效）~~, ~~模拟参考电压 AREF~~<br>RESET、AREF（Mega 还有 IOREF）在真实板子上有，但仿真元件没有这些接线端。 | — 元件上无此脚 |
+
+~~串口接收 RX~~ = 不支持
+
+### 电气极限
+
+- 每个 I/O 脚：建议 ≤ 20 mA，绝对最大 40 mA；经 VCC/GND 的总电流 ≤ 200 mA。
+- VIN 建议 7–12 V（极限 6–20 V）。原版板上 USB 有 500 mA 自恢复保险丝。
+- 引脚电压 −0.5 V … VCC + 0.5 V；内部上拉 20–50 kΩ；ADC 10 位，参考电压默认 VCC，或内部 1.1 V。
+- 存储器：32 KB Flash（引导程序占 0.5–2 KB），2 KB SRAM，1 KB EEPROM。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ Nano 元件没有 RST/AREF 接线端；`Serial` 直接输出到串口监视器，板载 LED 按 D13 上 1 kΩ + LED 建模。
+
+<a id="mega"></a>
+
+## Arduino Mega 2560 开发板
+
+Arduino Mega 2560（ATmega2560，16 MHz，5 V 逻辑）：54 个数字脚 D0–D53（15 个 PWM：D2–D13、D44–D46），16 个模拟输入 A0–A15（10 位），4 个硬件串口（Serial 在 D0/D1，Serial1 RX1 D19 / TX1 D18，Serial2 RX2 D17 / TX2 D16，Serial3 RX3 D15 / TX3 D14），I²C 在 D20/D21，SPI 在 D50–D53。256 KB Flash，8 KB SRAM，4 KB EEPROM。
+
+### 引脚图
+
+![Arduino Mega 2560 开发板](pinout-mega.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **D0 / D1** | PE0 · RXD0 / PE1 · TXD0 | 数字输入/输出, ~~串口接收 RX~~, ~~串口发送 TX~~<br>D0/D1 与板上的 USB 转串口芯片相连：上传程序和 `Serial` 通信都要用它们，外接电路可能导致上传失败。仿真中 D0/D1 可当普通 IO，`Serial` 直接连到串口监视器。 | ◐ 部分支持 |
+| **D2–D13 ~** | OC3B · OC3C · OC0B · OC3A · OC4A–C · OC2B · OC2A · OC1A · OC1B · OC0A | 数字输入/输出, PWM 约 490 Hz<br>D4 和 D13 使用 Timer0，约 980 Hz；其余 PWM 脚（D2、D3、D5–D12、D44–D46）约 490 Hz。 | ✓ 支持 |
+| **D13** | PB7 | 数字输入/输出, 板载 LED「L」 | ✓ 支持 |
+| **D14–D19** | TX3 · RX3 · TX2 · RX2 · TX1 · RX1 | 数字输入/输出, ~~串口发送 TX~~, ~~串口接收 RX~~<br>额外的硬件串口：Serial3 = TX3 D14 / RX3 D15，Serial2 = TX2 D16 / RX2 D17，Serial1 = TX1 D18 / RX1 D19。仿真中这些脚可作普通数字脚，但 `Serial1`–`Serial3` 会编译报错，只模拟 `Serial`（串口监视器）。 | ◐ 部分支持 |
+| **D20 / D21** | SDA / SCL | 数字输入/输出, ~~I²C 数据 SDA~~, ~~I²C 时钟 SCL~~ | ◐ 部分支持 |
+| **D22–D43, D47–D49** | PA · PC · PL · PG · PD7 | 数字输入/输出 | ✓ 支持 |
+| **D44–D46 ~** | OC5C · OC5B · OC5A | 数字输入/输出, PWM 约 490 Hz | ✓ 支持 |
+| **D50–D53** | MISO · MOSI · SCK · SS | 数字输入/输出, ~~SPI 主入从出 MISO~~, ~~SPI 主出从入 MOSI~~, ~~SPI 时钟 SCK~~, ~~SPI 片选 SS~~ | ◐ 部分支持 |
+| **A0–A15 (D54–D69)** | PF0–PF7 · PK0–PK7 · ADC0–ADC15 | 模拟输入（10 位 ADC）, 数字输入/输出 | ✓ 支持 |
+| **5V** |  | 5 V 电源<br>来自板载 5 V 稳压器（VIN/DC 供电时）或 USB。可给传感器和小模块供电；USB 供电时全板受 500 mA 自恢复保险丝限制。也能从这里输入稳压的 5 V，但会绕过稳压器和保护电路。 | ✓ 支持 |
+| **3.3V** |  | 3.3 V 电源输出<br>板载 3.3 V 稳压输出，最大 50 mA。 | ✓ 支持 |
+| **VIN** |  | 外部电源输入 VIN<br>外部电源输入（DC 插座经二极管接到这里），推荐 7–12 V，极限 6–20 V。低于 7 V 时 5 V 可能不稳，高于 12 V 稳压器容易过热。 | ✓ 支持 |
+| **GND ×5** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **RESET · AREF · IOREF** |  | ~~复位（低电平有效）~~, ~~模拟参考电压 AREF~~, ~~IO 电平参考 IOREF~~<br>RESET、AREF（Mega 还有 IOREF）在真实板子上有，但仿真元件没有这些接线端。 | — 元件上无此脚 |
+
+~~串口接收 RX~~ = 不支持
+
+### 电气极限
+
+- 每个 I/O 脚：建议 ≤ 20 mA，绝对最大 40 mA；经 VCC/GND 的总电流 ≤ 200 mA。
+- VIN 建议 7–12 V（极限 6–20 V）；3.3V 引脚最多 50 mA。
+- ADC：10 位，16 通道 A0–A15；参考电压默认 VCC，或内部 1.1 V / 2.56 V，或外部 AREF。
+- 存储器：256 KB Flash（引导程序 8 KB），8 KB SRAM，4 KB EEPROM。外部中断在 D2、D3、D18、D19、D20、D21。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ 不模拟 `Serial1`–`Serial3`（编译报错），只有 `Serial` 可用。没有 RESET/AREF/IOREF/ICSP 接线端。
+
+<a id="promini"></a>
+
+## Arduino Pro Mini 开发板
+
+Arduino Pro Mini（ATmega328P）：不带 USB 的极简板，有 5 V/16 MHz 和 3.3 V/8 MHz 两个版本（在属性中选择）。D0–D13，A0–A7（A4–A7 在板子内侧焊盘），RAW 输入经板载稳压器，通过 6 针 USB 转串口插座下载程序。
+
+### 引脚图
+
+![Arduino Pro Mini 开发板](pinout-promini.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **D0 (RXI) / D1 (TXO)** | PD0 · RXD / PD1 · TXD | 数字输入/输出, ~~串口接收 RX~~, ~~串口发送 TX~~<br>D0 (RXI) / D1 (TXO) 也接到 6 针 USB 转串口插座（模块 TX → RXI，模块 RX ← TXO）。 | ◐ 部分支持 |
+| **D2, D4, D7, D8, D12** | PD2 · PD4 · PD7 · PB0 · PB4 | 数字输入/输出 | ✓ 支持 |
+| **D3, D5, D6, D9, D10, D11 ~** | OC2B · OC0B · OC0A · OC1A · OC1B · OC2A | 数字输入/输出, PWM 约 490 Hz, PWM 约 980 Hz | ✓ 支持 |
+| **D13** | PB5 · SCK | 数字输入/输出, ~~SPI 时钟 SCK~~, 板载 LED「L」<br>板载 LED“L”经电阻接在 D13 上：D13 为高电平时就亮，D13 作输入时它也是一个负载。 | ◐ 部分支持 |
+| **A0–A3** | PC0–PC3 · ADC0–ADC3 | 模拟输入（10 位 ADC）, 数字输入/输出 | ✓ 支持 |
+| **A4 / A5** | PC4 · SDA / PC5 · SCL | 模拟输入（10 位 ADC）, 数字输入/输出, ~~I²C 数据 SDA~~, ~~I²C 时钟 SCL~~<br>A4/A5（I²C SDA/SCL）和 A6/A7 在板子内侧焊盘上，不在两侧长排针上；不同版本位置不一样。 | ◐ 部分支持 |
+| **A6, A7** | ADC6 · ADC7 | 模拟输入（10 位 ADC）<br>A6、A7（ADC6/ADC7 只有贴片 TQFP/QFN 封装才有）只连到 ADC：`analogRead(A6)` 可以，`pinMode`、`digitalRead`、`digitalWrite` 都不行——仿真器会报错。 | ✓ 支持 |
+| **VCC** |  | 电源 VCC<br>VCC 是稳压后的电源轨：5 V/16 MHz 版为 5 V，3.3 V/8 MHz 版为 3.3 V。可由 USB 转串口模块或稳压电源供电；从 RAW 供电时它也可作输出。 | ✓ 支持 |
+| **RAW** |  | 未稳压输入 RAW<br>RAW 接板载低压差稳压器（MIC5205 类，约 150 mA）：最高 12 V。3.3 V 版可以直接接一节锂电池（3.4–4.2 V）。 | ✓ 支持 |
+| **GND ×2** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **RST ×2 · FTDI header** | DTR · TXO · RXI · VCC · GND | ~~复位（低电平有效）~~<br>6 针 USB 转串口插座（DTR、TXO、RXI、VCC、GND）和 RST 引脚没有单独的接线端；选择供电方式“USB 转串口模块”即可给 VCC 供电。 | — 元件上无此脚 |
+
+~~串口接收 RX~~ = 不支持
+
+### 电气极限
+
+- 每个 I/O 脚：建议 ≤ 20 mA，绝对最大 40 mA；经 VCC/GND 的总电流 ≤ 200 mA。
+- RAW：5 V 版最高 12 V；3.3 V 版 3.35–12 V。板载稳压器约可输出 150 mA。
+- ATmega328P 在 3.3 V 下只保证到约 10 MHz，所以 3.3 V 版用 8 MHz。
+- 存储器：32 KB Flash（引导程序占 0.5–2 KB），2 KB SRAM，1 KB EEPROM。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ 3.3 V/8 MHz 版通过把指令速度和 PWM 频率减半来模拟（`delay()`/`millis()` 仍按真实时间）。不模拟转串口插座和 DTR 自动复位；供电方式“USB 转串口模块”是理想的 VCC 电源。
+
+<a id="esp32"></a>
+
+## ESP32 开发板 (DevKit V1 30 针)
+
+ESP32 DevKit V1（30 针版，ESP32-WROOM-32，双核 240 MHz，3.3 V 逻辑）。引脚按 GPIO 号编号（digitalWrite(2, HIGH) 即 GPIO2）。15 个脚有 12 位 ADC（ADC1 和 ADC2），2 路 DAC（GPIO25/26），10 个触摸脚 T0–T9，任意输出脚都可用 LEDC PWM，GPIO34–39 只能输入。板上有 CP2102/CH340 USB 转串口芯片、AMS1117 3.3 V 稳压器、EN 和 BOOT 按键，GPIO2 接蓝色 LED。
+
+### 引脚图
+
+![ESP32 开发板 (DevKit V1 30 针)](pinout-esp32.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **GPIO36 (VP), GPIO39 (VN), GPIO34, GPIO35** | ADC1_CH0 · CH3 · CH6 · CH7 | 只能输入, 12 位模拟输入<br>GPIO34–GPIO39 只能输入：没有输出驱动，也没有内部上拉/下拉。`pinMode(34, OUTPUT)` 和 `INPUT_PULLUP` 会报错，请外接电阻。VP = GPIO36，VN = GPIO39。 | ✓ 支持 |
+| **GPIO32, GPIO33** | ADC1_CH4 / CH5 · T9 / T8 | 数字输入/输出, PWM 输出 (analogWrite), 12 位模拟输入, 电容触摸 (touchRead) | ✓ 支持 |
+| **GPIO25, GPIO26** | DAC1 / DAC2 · ADC2_CH8 / CH9 | 数字输入/输出, PWM 输出 (analogWrite), 8 位 DAC 输出 (dacWrite), ADC2（WiFi 开启时不可用）<br>GPIO25/GPIO26 是两路 8 位 DAC：`dacWrite(25, 0…255)` 输出约 0…3.3 V。它们也可作普通 I/O 和 PWM。 | ✓ 支持 |
+| **GPIO4, 12, 13, 14, 15, 27** | ADC2 · T0 · T5 · T4 · T6 · T3 · T7 | 数字输入/输出, PWM 输出 (analogWrite), ADC2（WiFi 开启时不可用）, 电容触摸 (touchRead)<br>这些脚属于 ADC2，WiFi 驱动会占用它：WiFi 开启时对它们 `analogRead` 会失败。模拟输入请优先用 ADC1 脚（GPIO32–GPIO39）。（仿真中 WiFi 从不开启，所以这里 ADC2 可以读。） | ✓ 支持 |
+| **GPIO2** | ADC2_CH2 · T2 | 数字输入/输出, PWM 输出 (analogWrite), ADC2（WiFi 开启时不可用）, 电容触摸 (touchRead), 板载 LED（高电平点亮）, ~~启动配置脚 (strapping)~~ | ◐ 部分支持 |
+| **GPIO0 (BOOT)** | ADC2_CH1 · T1 | 数字输入/输出, ~~启动配置脚 (strapping)~~<br>GPIO0 接 BOOT 按键和上拉电阻；复位时保持低电平会进入下载（烧录）模式。30 针板没有把它引到排针上，所以仿真中它只在板内存在（读到高电平）。 | ◐ 部分支持 |
+| **GPIO5, 12, 15** | GPIO5 · MTDI · MTDO | ~~启动配置脚 (strapping)~~<br>启动配置脚在复位时被采样：GPIO0 和 GPIO2 决定启动/下载模式，GPIO12 (MTDI) 决定 flash 电压（启动时为高 = 1.8 V，3.3 V flash 的模组就无法启动），GPIO15 (MTDO) 控制启动日志，GPIO5 决定 SDIO 时序。不要在这些脚上接强上拉/下拉。仿真器不检查启动配置。 | ✗ 不支持 |
+| **GPIO1 (TX0) / GPIO3 (RX0)** | UART0 | 数字输入/输出, ~~串口发送 TX~~, ~~串口接收 RX~~<br>GPIO1 (TX0) / GPIO3 (RX0) 接 USB 转串口芯片，用于下载和 `Serial`；尽量不要接其他电路。 | ◐ 部分支持 |
+| **GPIO16 (RX2) / GPIO17 (TX2), GPIO5, 18, 19, 23** | UART2 · VSPI SS / SCK / MISO / MOSI | 数字输入/输出, PWM 输出 (analogWrite) | ✓ 支持 |
+| **GPIO21 / GPIO22** | SDA / SCL | 数字输入/输出, PWM 输出 (analogWrite), ~~I²C 数据 SDA~~, ~~I²C 时钟 SCL~~ | ◐ 部分支持 |
+| **EN** | CHIP_PU | 复位 RESET（低电平有效）<br>EN (CHIP_PU) 为芯片使能；板上有 10 kΩ 上拉和 EN 按键。把 EN 拉低，ESP32 就保持复位。 | ✓ 支持 |
+| **VIN** |  | 外部电源输入 VIN<br>VIN（有的板标为 5V）是 AMS1117 3.3 V 稳压器的输入，并与 USB 5 V 相连。通常用 5 V 供电；电压更高线性稳压器会发热。开 WiFi 时 ESP32 电流峰值可达几百 mA。 | ✓ 支持 |
+| **3V3** |  | 3.3 V 电源输出 | ✓ 支持 |
+| **GND ×2** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **GPIO6–GPIO11** | SPI FLASH | ~~数字输入/输出~~<br>GPIO6–GPIO11 连接模组内部 SPI flash，不能使用；30 针板没有引出，程序使用它们时仿真器会报错。 | — 元件上无此脚 |
+
+~~启动配置脚 (strapping)~~ = 不支持
+
+### 电气极限
+
+- 供电 3.0–3.6 V（标称 3.3 V）；欠压检测约 2.43 V 时复位。WiFi 发射时电流峰值可达几百 mA。
+- GPIO 电平：高 ≥ 0.75 × VDD，低 ≤ 0.25 × VDD。默认驱动约 20 mA，每脚最大 40 mA。不耐 5 V。
+- 内部上拉、下拉约 45 kΩ（`INPUT_PULLUP`、`INPUT_PULLDOWN`），GPIO34–GPIO39 除外。
+- ADC：12 位（0–4095）。默认 11 dB 衰减下可用范围约 0.15–3.1 V，两端附近不线性。
+- DAC：GPIO25/26，8 位。LEDC PWM：16 通道，频率与分辨率此消彼长（如 5 kHz 对应 13 位）；`analogWrite` 用 8 位。
+- 存储器：芯片内 520 KB SRAM，WROOM-32 模组内 4 MB SPI flash。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ 不模拟 WiFi、蓝牙、ESP-NOW 和 Web 服务器：`#include <WiFi.h>`（等）会在该行报错。由于 WiFi 从不开启，ADC2 脚可以正常读。
+- ✗ ADC 按线性建模（0–3.3 V → 0–4095），`analogReadMilliVolts` 也一样；真实 ADC 非线性且在约 3.1 V 饱和。`touchRead` 对属性中选为“被触摸”的脚返回约 12，其他脚约 75。
+- ✗ 不模拟深度睡眠、RTC、FreeRTOS 任务/第二核、I²S、CAN 和霍尔传感器。GPIO0 (BOOT) 只存在于板内模型，复位时不检查启动配置脚。
+
+<a id="pico"></a>
+
+## 树莓派 Pico 开发板
+
+树莓派 Pico（RP2040，双核 Cortex-M0+ 133 MHz，264 KB SRAM，2 MB Flash，3.3 V 逻辑），用 Arduino-Pico 核心编程。40 针 DIP 形式：边缘有 GP0–GP22 和 GP26–GP28，8 个 GND，VBUS / VSYS / 3V3 / RUN。GP26–GP28 (A0–A2) 为 12 位 ADC，每个 GPIO 都可 PWM，GP25 接板载 LED；GP24 和 GP29 用于板上电路。
+
+### 引脚图
+
+![树莓派 Pico 开发板](pinout-pico.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **GP0–GP22** | GPIO0–GPIO22 | 数字输入/输出, PWM 输出 (analogWrite)<br>每个 GP 脚都可作数字 I/O 和 PWM（8 个 PWM slice × 2 通道；同一 slice 的脚共用频率）。驱动能力 2/4/8/12 mA（默认 4 mA）。不耐 5 V。 | ✓ 支持 |
+| **GP0 / GP1** | UART0 TX / RX | ~~串口发送 TX~~, ~~串口接收 RX~~ | ✗ 不支持 |
+| **GP4 / GP5** | I2C0 SDA / SCL | ~~I²C 数据 SDA~~, ~~I²C 时钟 SCL~~ | ✗ 不支持 |
+| **GP26–GP28 (A0–A2)** | ADC0–ADC2 | 数字输入/输出, PWM 输出 (analogWrite), 12 位模拟输入<br>GP26–GP28 是 ADC0–ADC2（A0–A2）。Arduino-Pico 默认返回 10 位，调用 `analogReadResolution(12)` 可得 0–4095。参考电压为 ADC_VREF（滤波后的 3.3 V）。 | ✓ 支持 |
+| **GP25** | LED | 板载 LED（高电平点亮） | ✓ 支持 |
+| **GP29 (A3)** | ADC3 · VSYS ÷ 3 | 12 位模拟输入<br>GP29（ADC3，A3）经板载 200 kΩ / 100 kΩ 分压测 VSYS：VSYS = 读数 × 3 × 3.3 V / 4095（12 位）。没有引到排针。 | ✓ 支持 |
+| **GP24** | VBUS SENSE | 数字输入/输出<br>用于板上电路，没有引到排针：GP23 控制板载电源转换器的省电模式，GP24 检测 VBUS（接 USB 时为高），GP25 驱动 LED。仿真中有 GP24 和 GP25；使用 GP23 会报“不存在”。 | ✓ 支持 |
+| **VBUS** |  | USB 5 V (VBUS)<br>VBUS 即 micro-USB 的 5 V，经肖特基二极管接到 VSYS；接 USB 时可给 5 V 器件供电。 | ✓ 支持 |
+| **VSYS** |  | 系统电源输入 VSYS<br>VSYS 是主电源输入（1.8–5.5 V），供给板载升降压转换器（RT6150）产生 3.3 V。电池接这里（若同时可能接 USB，请自加二极管）。 | ✓ 支持 |
+| **3V3 (OUT)** |  | 3.3 V 电源输出<br>板载转换器的 3.3 V 输出；外部负载请控制在约 300 mA 以下。 | ✓ 支持 |
+| **RUN** |  | 复位 RESET（低电平有效）<br>RUN 是 RP2040 的使能输入，带上拉：接 GND 就复位 Pico（复位按键接在 RUN 和 GND 之间）。 | ✓ 支持 |
+| **GND ×7 · AGND** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **3V3_EN · ADC_VREF** |  | ~~3.3 V 稳压器使能~~, ~~模拟参考电压 AREF~~<br>3V3_EN（有上拉，拉低会关闭 3.3 V 转换器）和 ADC_VREF（ADC 参考，滤波后的 3.3 V）在仿真元件中没有接线端。 | — 元件上无此脚 |
+| **GP23** | SMPS PS | ~~数字输入/输出~~<br>用于板上电路，没有引到排针：GP23 控制板载电源转换器的省电模式，GP24 检测 VBUS（接 USB 时为高），GP25 驱动 LED。仿真中有 GP24 和 GP25；使用 GP23 会报“不存在”。 | — 元件上无此脚 |
+
+~~串口发送 TX~~ = 不支持
+
+### 电气极限
+
+- 供电：VSYS 1.8–5.5 V 或 VBUS 5 V；3V3 输出负载不宜超过约 300 mA。
+- GPIO（3.3 V）：高 ≥ 2.0 V，低 ≤ 0.8 V；驱动 2/4/8/12 mA（默认 4 mA）；GPIO 总电流最多 50 mA。不耐 5 V。
+- 内部上拉/下拉 50–80 kΩ。
+- ADC：12 位，500 kS/s，4 路外部输入（GP26–GP29）加内部温度传感器；有效分辨率约 9 位。
+- PWM：8 个 slice × 2 通道（16 路输出）。Arduino-Pico 默认 1 kHz、范围 255；可用 `analogWriteFreq`、`analogWriteRange` 或 `analogWriteResolution` 修改。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ 不模拟第二核（`setup1`/`loop1`）、PIO、USB 设备功能和温度传感器（ADC4）。GP23、3V3_EN、ADC_VREF 没有接线端；ADC 参考电压取 3V3 电源。
+- ✗ RT6150 升降压转换器按理想 3.3 V 稳压器建模（效率 85%，限流 0.8 A），VSYS 低于 1.8 V 时停止；不模拟开关纹波。
+
+<a id="bluepill"></a>
+
+## STM32 蓝色小板 Blue Pill (F103C8)
+
+STM32“蓝色小板” Blue Pill（STM32F103C8T6，Cortex-M3 72 MHz，64 KB Flash，20 KB SRAM，3.3 V 逻辑），用 STM32duino 核心编程：引脚按端口和位命名（PA0、PB12、PC13 …）。10 个脚有 12 位 ADC，15 个脚有定时器 PWM，PC13 接板载 LED（低电平点亮），3.3 V 稳压器由 5V 引脚或 micro-USB 供电。
+
+### 引脚图
+
+![STM32 蓝色小板 Blue Pill (F103C8)](pinout-bluepill.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **PA0–PA3, PA6, PA7** | ADC12_IN0–IN3 · IN6 · IN7 · TIM2 / TIM3 | 数字输入/输出, 12 位模拟输入, PWM 输出 (analogWrite)<br>PA0–PA7、PB0、PB1 为 ADC 通道 IN0–IN9（12 位，0–3.3 V）。STM32duino 的 `analogRead` 默认返回 10 位，调用 `analogReadResolution(12)` 才是 12 位。模拟脚不耐 5 V。 | ✓ 支持 |
+| **PA4, PA5** | ADC12_IN4 · IN5 | 数字输入/输出, 12 位模拟输入 | ✓ 支持 |
+| **PB0, PB1** | ADC12_IN8 · IN9 · TIM3_CH3 / CH4 | 数字输入/输出, 12 位模拟输入, PWM 输出 (analogWrite) | ✓ 支持 |
+| **PA8–PA11** | TIM1_CH1–CH4 | 数字输入/输出, PWM 输出 (analogWrite), ~~耐 5 V (FT)~~ | ◐ 部分支持 |
+| **PA9 / PA10** | USART1 TX / RX | ~~串口发送 TX~~, ~~串口接收 RX~~ | ✗ 不支持 |
+| **PA11 / PA12** | USB D− / D+ | 数字输入/输出, ~~耐 5 V (FT)~~<br>PA11/PA12 是 micro-USB 的 D−/D+ 线。很多 Blue Pill 在 D+ 上用了 10 kΩ 而不是 1.5 kΩ 上拉，部分电脑会识别失败。用 USB 时不要再拿它们当 I/O。 | ◐ 部分支持 |
+| **PA15, PB3, PB4, PB5** | JTDI · JTDO · NJTRST | 数字输入/输出, ~~耐 5 V (FT)~~ | ◐ 部分支持 |
+| **PB6 / PB7** | I2C1 SCL / SDA · TIM4_CH1 / CH2 | 数字输入/输出, PWM 输出 (analogWrite), ~~I²C 时钟 SCL~~, ~~I²C 数据 SDA~~, ~~耐 5 V (FT)~~ | ◐ 部分支持 |
+| **PB8, PB9** | TIM4_CH3 / CH4 | 数字输入/输出, PWM 输出 (analogWrite), ~~耐 5 V (FT)~~ | ◐ 部分支持 |
+| **PB10–PB15** | I2C2 · USART3 · SPI2 | 数字输入/输出, ~~耐 5 V (FT)~~ | ◐ 部分支持 |
+| **PC13** |  | 数字输入/输出, 板载 LED（低电平点亮）<br>PC13–PC15 经后备域电源开关供电：只能灌入约 3 mA，翻转速度不超过 2 MHz，不能输出拉电流（例如驱动接地的 LED）。板载 LED 从 3.3 V 接到 PC13，所以 PC13 为低电平时亮。PC14/PC15 还是 32.768 kHz 晶振脚。 | ✓ 支持 |
+| **PC14, PC15** | OSC32_IN / OUT | 数字输入/输出, ~~外部晶振引脚~~ | ◐ 部分支持 |
+| **5V** |  | 5 V 电源<br>5V 引脚：与 micro-USB 的 5 V 相连，也是板载 3.3 V 稳压器的输入。这里只能接 5 V 左右（小稳压器不适合更高电压），千万不要把 5 V 接到 3.3 脚。 | ✓ 支持 |
+| **3.3 ×2** |  | 3.3 V 电源输出 | ✓ 支持 |
+| **G ×3** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+| **R** | NRST | 复位 RESET（低电平有效） | ✓ 支持 |
+| **VB** | VBAT | ~~备用电池 VBAT~~<br>VB (VBAT) 在主电源断开时给 RTC 和备份寄存器供电；不用时接 3.3 V。仿真元件中没有这个接线端。 | — 元件上无此脚 |
+| **PA13 / PA14** | SWDIO / SWCLK | ~~SWD 调试口~~<br>PA13/PA14（SWDIO/SWCLK）在板子末端的 4 针调试口上，供 ST-Link 下载和调试；仿真元件中没有这些接线端。 | — 元件上无此脚 |
+
+~~耐 5 V (FT)~~ = 不支持
+
+### 电气极限
+
+- 供电 VDD 2.0–3.6 V（由板载稳压器提供 3.3 V）。
+- 引脚电流：标准电平 ±8 mA（放宽电平 ±20 mA），每脚绝对最大 25 mA，总计 150 mA。
+- FT 脚作输入（或开漏输出）时可承受 5 V；带模拟功能的脚（PA0–PA7、PB0、PB1）不行。
+- 上拉/下拉 30–50 kΩ。ADC：12 位，0–3.3 V，每次转换约 1 µs。
+- PC13–PC15：最多灌入 3 mA，最高 2 MHz，同时只能有一个在翻转，不能作电流源。
+
+### 仿真支持
+
+- ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ EEPROM、睡眠模式、看门狗、熔丝设置以及直接操作寄存器（如 `PORTB`、`DDRB`）不支持。
+- ✗ 不模拟指令执行时间：代码视为瞬间完成，只有 `delay()`、`millis()` 等推动时间；死循环超过运算上限会报错。
+- ✗ 不模拟 PA11/PA12 上的 USB、BOOT0/BOOT1 跳线、SWD、VBAT/RTC 和晶振，也不检查耐 5 V。`Serial` 直接输出到串口监视器。
+
+<a id="c51"></a>
+
+## 8051 单片机 (STC89C52 / AT89C52, 40 脚)
+
+经典 8051 单片机（STC89C52RC / AT89C52，DIP-40，5 V，8 KB Flash，256 B RAM）。32 根 I/O 线分成 P0–P3 四个 8 位口，可整口写（P1 = 0xFE;）或按位操作（sbit LED = P1^0;）。一个机器周期 = 12 个晶振时钟；常用 11.0592 MHz 晶振，因为它能得到准确的串口波特率。需要 RST 复位电路、XTAL1/XTAL2 晶振，EA 接 VCC。
+
+### 引脚图
+
+![8051 单片机 (STC89C52 / AT89C52, 40 脚)](pinout-c51.svg)
+
+`数字 IO` · `PWM 输出` · `模拟输入` · `通信 (UART/SPI/I²C)` · `外部中断` · `电源` · `地` · `特殊功能` — 虚线框 = 仿真器未模拟
+
+### 引脚表
+
+| 引脚 | 端口 / 数据手册名称 | 功能与说明 | 仿真 |
+|---|---|---|---|
+| **P0.0–P0.7 (39–32)** | AD0–AD7 | 开漏口 P0<br>P0 没有内部上拉（开漏）：写 1 时引脚悬空。作输出或输入都要外接上拉（常用 10 kΩ 排阻接 VCC）。P0 还是外部存储器的地址/数据复用总线 AD0–AD7。 | ✓ 支持 |
+| **P1.0–P1.7 (1–8)** | T2 · T2EX (P1.0 / P1.1) | 准双向 I/O<br>P1–P3 是准双向口：写 0 时强下拉到 GND（可灌入几 mA），写 1 只有弱上拉（几十 µA）。所以 LED 要低电平点亮（VCC → 电阻 → LED → 引脚）；作输入前先写 1。 | ✓ 支持 |
+| **P2.0–P2.7 (21–28)** | A8–A15 | 准双向 I/O | ✓ 支持 |
+| **P3.0 / P3.1 (10, 11)** | RXD / TXD | 准双向 I/O, ~~串口接收 RX~~, ~~串口发送 TX~~ | ◐ 部分支持 |
+| **P3.2 / P3.3 (12, 13)** | INT0 / INT1 | 准双向 I/O, ~~外部中断 INT0~~, ~~外部中断 INT1~~ | ◐ 部分支持 |
+| **P3.4 / P3.5 (14, 15)** | T0 / T1 | 准双向 I/O, ~~定时器/计数器输入 T0/T1~~ | ◐ 部分支持 |
+| **P3.6 / P3.7 (16, 17)** | WR / RD | 准双向 I/O, ~~外部存储器总线~~ | ◐ 部分支持 |
+| **RST (9)** |  | 复位（高电平有效）<br>RST 高电平有效：保持高电平至少 2 个机器周期即复位。常用电路：VCC 到 RST 接 10 µF，RST 到 GND 接 10 kΩ（上电复位），再加一个 RST 到 VCC 的按键。 | ✓ 支持 |
+| **XTAL1 / XTAL2 (19, 18)** |  | ~~外部晶振引脚~~<br>XTAL1/XTAL2：接晶振（如 11.0592 MHz 或 12 MHz），两只 30 pF 电容接地。仿真中频率由板子的“晶振频率”属性设定，这两个脚不用接。 | ✗ 不支持 |
+| **EA (31)** | EA / VPP | 外部程序存储器选择 EA<br>EA 为高：执行内部 Flash 程序。EA 为低：只从外部存储器取指令，内部程序不会运行。EA 一定要接 VCC。 | ✓ 支持 |
+| **PSEN / ALE (29, 30)** |  | ~~外部存储器总线~~ | ✗ 不支持 |
+| **VCC (40)** |  | 电源 VCC<br>VCC 5 V（AT89C52：4.0–6.0 V；STC89C52RC 请用 5 V 版）。仿真芯片约 3.8 V 以上启动，约 3.5 V 以下停止。 | ✓ 支持 |
+| **GND (20)** |  | 地 GND<br>所有 GND 引脚在板上是连通的，用哪一个都可以。 | ✓ 支持 |
+
+~~串口接收 RX~~ = 不支持
+
+### 电气极限
+
+- 供电 5 V（AT89C52：4.0–6.0 V）。AT89C52 时钟 0–24 MHz；一个机器周期 = 12 个时钟周期。
+- 灌电流（AT89C52）：每脚最大 10 mA，P0 口合计 26 mA，P1–P3 每口 15 mA，所有输出合计 71 mA。
+- 准双向口上拉只能输出约 50 µA（0→1 翻转瞬间稍大）：无法点亮接地的 LED，请用低电平点亮接法或三极管。
+- 5 V 下输入电平：低 ≤ 约 0.9 V，高 ≥ 约 1.9 V（端口脚），RST/XTAL1 需 ≥ 0.7 × VCC。
+- 存储器与外设：8 KB Flash，256 B RAM，3 个 16 位定时器（T0–T2），1 个串口，8 个中断源。
+
+### 仿真支持
+
+- ✗ 引脚过流不会「烧坏」芯片：仿真只给出警告，请对照电气极限自行检查。
+- ✗ 只模拟端口寄存器 P0–P3 及其位（`sbit`）。定时器、中断、串口及其他 SFR（`TMOD`、`TCON`、`IE`、`SCON`、`SBUF` …）会编译报错，Arduino 函数也一样。
+- ✗ 时间是估算的：计数循环每次约 8 个机器周期，每次端口访问 1 个机器周期。常见的 `delay_ms` 循环与真实芯片相差约 1% 以内，但并不是逐周期精确的 Keil 编译结果。如果程序没有定义 `delay_ms`，就用内置的精确版本。
+- ✗ 晶振频率由板子的“晶振频率”属性决定，XTAL1/XTAL2 不用接任何东西。EA 悬空按高电平处理（真实芯片请接 VCC）；RST 有内部下拉。
 
 ## 仿真支持
 
@@ -1435,6 +1784,492 @@ void loop() {
   level += step;
   if (level <= 0 || level >= 255) step = -step;
   delay(20);
+}
+```
+
+### Arduino Nano 开发板
+
+<a id="ex-nanoblink"></a>
+
+#### 单片机：Arduino Nano 闪烁 LED (Blink)
+
+Arduino Nano 的标准 Blink 程序：板载 LED 每 0.5 s 亮灭一次。
+
+**接线**
+
+- D13 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-nanoana"></a>
+
+#### 单片机：Nano 电位器调 LED 亮度 (A7 → D9)
+
+电位器接只能作模拟输入的 A7，用 analogRead 读取 (0–1023)，控制 D9 上 LED 的 PWM 亮度，数值打印到串口监视器。
+
+**接线**
+
+- 电位器: 两端 → 5V / GND, 中间抽头 → A7
+- D9 → 220 Ω 电阻 → c.led.name → GND
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · PWM：调光与调速 · 串口调试
+
+```cpp
+// Arduino Nano: a potentiometer on A7 (an analog-only pin) sets the brightness of an LED on D9 (PWM).
+const int LED_PIN = 9;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(LED_PIN, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(A7);          // 0 ... 1023 (A6 / A7 cannot be digital pins)
+  analogWrite(LED_PIN, raw / 4);     // 0 ... 255
+  Serial.print("A7 = ");
+  Serial.println(raw);
+  delay(100);
+}
+```
+
+### Arduino Mega 2560 开发板
+
+<a id="ex-megablink"></a>
+
+#### 单片机：Arduino Mega 2560 闪烁 LED (Blink)
+
+Arduino Mega 2560 的标准 Blink 程序：板载 LED 每 0.5 s 亮灭一次。
+
+**接线**
+
+- D13 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-megabar"></a>
+
+#### 单片机：Mega 2560 电位器 → 8 段 LED 光柱
+
+A15 上的电位器决定 8 段 LED 光柱（双排针 D23、D25 … D37）点亮几段。
+
+**接线**
+
+- 电位器: 两端 → 5V / GND, 中间抽头 → A15
+- D23, D25, D27 … D37 → 220 Ω 电阻 → LED 光柱 (10 段) 阳极（+，长脚）
+- LED 光柱 (10 段) 所有 LED 的阴极 → GND
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · 数字输出与 LED 限流电阻 · 串口调试
+
+```cpp
+// Arduino Mega 2560: a potentiometer on A15 drives an 8-segment LED bar graph
+// on D37, D35 ... D23 (odd pins of the double header, each through 220 ohm): the bar grows from the green end.
+const int LEDS[8] = {37, 35, 33, 31, 29, 27, 25, 23};
+
+void setup() {
+  Serial.begin(9600);
+  for (int i = 0; i < 8; i++) pinMode(LEDS[i], OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(A15);                 // 16 analog inputs A0 ... A15
+  int n = map(raw, 0, 1023, 0, 8);           // number of lit segments
+  for (int i = 0; i < 8; i++) digitalWrite(LEDS[i], i < n ? HIGH : LOW);
+  Serial.print("A15 = ");
+  Serial.print(raw);
+  Serial.print("  segments = ");
+  Serial.println(n);
+  delay(100);
+}
+```
+
+### Arduino Pro Mini 开发板
+
+<a id="ex-pmblink"></a>
+
+#### 单片机：Arduino Pro Mini 闪烁 LED (Blink)
+
+Pro Mini 用 9 V 电池接 RAW 供电：板载稳压器输出 VCC = 5 V，D13 的 LED 每 0.5 s 闪烁。
+
+**接线**
+
+- 电池 9 V: + → RAW, − → GND
+- D13 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-pmbatt"></a>
+
+#### 单片机：Pro Mini 3.3V 锂电池电压监测
+
+3.3 V/8 MHz 版 Pro Mini 由 RAW 上的 18650 电池供电；A0 通过 100k/100k 分压测电池电压，低于 3.5 V 时 D13 的 LED 快闪。
+
+**接线**
+
+- 18650 锂电池 3.7 V: + → RAW, − → GND
+- RAW → 100 kΩ 电阻 → A0 → 100 kΩ 电阻 → GND
+- D13 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · 供电方式 · 串口调试
+
+```cpp
+// Pro Mini 3.3 V / 8 MHz on a 3.7 V Li-ion cell (RAW -> on-board 3.3 V regulator).
+// A0 measures the cell through a 100k / 100k divider; the LED on D13 blinks fast when the cell is low.
+void setup() {
+  Serial.begin(9600);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  float vbat = analogRead(A0) * 3.3 / 1023.0 * 2;   // reference = VCC = 3.3 V, divider halves the cell voltage
+  Serial.print("battery: ");
+  Serial.print(vbat, 2);
+  Serial.println(" V");
+  int ms = vbat < 3.5 ? 200 : 1000;
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(ms / 2);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(ms / 2);
+}
+```
+
+### ESP32 开发板 (DevKit V1 30 针)
+
+<a id="ex-espblink"></a>
+
+#### 单片机：ESP32 闪烁 LED (Blink)
+
+ESP32 的标准 Blink 程序：板载 LED 每 0.5 s 亮灭一次。
+
+**接线**
+
+- GPIO2 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the blue LED on GPIO2 of the DevKit turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-espdac"></a>
+
+#### 单片机：ESP32 DAC 三角波 + ADC 回读 + 触摸
+
+GPIO25 用 dacWrite 输出慢速三角波，GPIO34（12 位 ADC1）读回；GPIO18 用 PWM 调 LED 亮度；触摸脚 T0（GPIO4，在板子属性中设为“被触摸”）控制 GPIO2 的蓝色 LED。
+
+**接线**
+
+- GPIO25 (DAC1) → GPIO34 (ADC1)
+- GPIO18 → 220 Ω 电阻 → c.led.name → GND
+- T0 = GPIO4
+- GPIO2 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · PWM：调光与调速 · 串口调试
+
+```cpp
+// ESP32: the DAC on GPIO25 makes a slow triangle wave, GPIO34 (ADC1, 12 bit) reads it back,
+// GPIO18 fades an LED with PWM, and touch pad T0 (GPIO4) switches the blue LED on GPIO2.
+// To "touch" T0: select the board and choose T0 as the touched pin in its properties.
+const int DAC_PIN = 25;
+const int ADC_PIN = 34;
+const int LED_PIN = 18;
+int level = 0;
+int step = 5;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+  analogReadResolution(12);
+}
+
+void loop() {
+  dacWrite(DAC_PIN, level);              // 0 ... 255 -> 0 ... 3.3 V
+  analogWrite(LED_PIN, level);           // same value as PWM duty
+  delay(1);                              // let the DAC output settle before sampling it
+  int raw = analogRead(ADC_PIN);         // 0 ... 4095
+  int mv = analogReadMilliVolts(ADC_PIN);
+  bool touched = touchRead(T0) < 40;     // the value drops when a finger is on the pad
+  digitalWrite(LED_BUILTIN, touched ? HIGH : LOW);
+  Serial.print("DAC=");
+  Serial.print(level);
+  Serial.print(" ADC=");
+  Serial.print(raw);
+  Serial.print(" mV=");
+  Serial.print(mv);
+  Serial.print(" touch=");
+  Serial.println(touched ? "yes" : "no");
+  level += step;
+  if (level >= 255 || level <= 0) step = -step;
+  delay(50);
+}
+```
+
+### 树莓派 Pico 开发板
+
+<a id="ex-picoblink"></a>
+
+#### 单片机：树莓派 Pico 闪烁 LED (Blink)
+
+树莓派 Pico 的标准 Blink 程序：板载 LED 每 0.5 s 亮灭一次。
+
+**接线**
+
+- GP25 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the on-board LED (GP25) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-picoadc"></a>
+
+#### 单片机：Pico 电位器 (12 位 ADC) → PWM 调光
+
+GP26 (ADC0) 上的电位器用 analogReadResolution(12) 读取，通过 analogWriteRange(4095) 驱动 GP15 的 LED；A3 (GP29) 测 VSYS/3，超过一半量程时板载 LED (GP25) 点亮。
+
+**接线**
+
+- 电位器: 两端 → 3V3 / AGND, 中间抽头 → GP26 (ADC0)
+- GP15 → 220 Ω 电阻 → c.led.name → GND
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · PWM：调光与调速 · 串口调试
+
+```cpp
+// Raspberry Pi Pico: a potentiometer on GP26 (ADC0) sets the brightness of an LED on GP15 (PWM).
+// The ADC is read with 12 bits; A3 (GP29) measures VSYS / 3 on the board.
+const int POT_PIN = A0;      // GP26
+const int LED_PIN = 15;      // GP15
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);  // 0 ... 4095
+  analogWriteRange(4095);    // PWM duty 0 ... 4095 as well
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(POT_PIN);
+  analogWrite(LED_PIN, raw);
+  float vsys = analogRead(A3) * 3.3 * 3 / 4095.0;
+  digitalWrite(LED_BUILTIN, raw > 2048 ? HIGH : LOW);
+  Serial.print("ADC0=");
+  Serial.print(raw);
+  Serial.print("  VSYS=");
+  Serial.print(vsys, 2);
+  Serial.println(" V");
+  delay(100);
+}
+```
+
+### STM32 蓝色小板 Blue Pill (F103C8)
+
+<a id="ex-bpblink"></a>
+
+#### 单片机：STM32 Blue Pill 闪烁 LED (PC13)
+
+STM32 Blue Pill 的标准 Blink 程序：板载 LED 每 0.5 s 亮灭一次。
+
+**接线**
+
+- PC13 (LED_BUILTIN) → 板载 LED（L）
+
+**相关用法:** 数字输出与 LED 限流电阻
+
+```cpp
+// Blink: the green LED on PC13 lights when PC13 is LOW (active-low), every half second.
+void setup() {
+  pinMode(PC13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(PC13, HIGH);
+  delay(500);
+  digitalWrite(PC13, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-bpadc"></a>
+
+#### 单片机：Blue Pill 12 位 ADC + PWM 调光
+
+PA0 上的电位器用 12 位 ADC 读取（analogReadResolution(12)），PA8 的 LED 用 PWM 调光，超过一半量程时低电平点亮的板载 LED (PC13) 亮。
+
+**接线**
+
+- 电位器: 两端 → 3.3 / G, 中间抽头 → PA0
+- PA8 → 220 Ω 电阻 → c.led.name → G
+- PC13 → 板载 LED（L）
+
+**相关用法:** 模拟输入：电位器、分压、光敏/热敏电阻 · PWM：调光与调速 · 串口调试
+
+```cpp
+// STM32 Blue Pill: potentiometer on PA0 read with the 12-bit ADC, LED on PA8 dimmed by PWM,
+// on-board LED on PC13 (active LOW) lights above half scale.
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);
+  pinMode(PC13, OUTPUT);
+  pinMode(PA8, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(PA0);             // 0 ... 4095
+  analogWrite(PA8, raw / 16);            // 0 ... 255
+  digitalWrite(PC13, raw > 2048 ? LOW : HIGH);
+  Serial.print("PA0=");
+  Serial.print(raw);
+  Serial.print("  ");
+  Serial.print(raw * 3.3 / 4095.0, 3);
+  Serial.println(" V");
+  delay(100);
+}
+```
+
+### 8051 单片机 (STC89C52 / AT89C52, 40 脚)
+
+<a id="ex-c51blink"></a>
+
+#### 单片机：8051 闪烁 LED (P1.0)
+
+经典 C51 程序：sbit LED = P1^0，加 delay_ms 计数延时（11.0592 MHz 晶振）。LED 接法为 VCC → 1 kΩ → LED → P1.0，引脚为低电平时点亮。
+
+**接线**
+
+- 电池 5 V: + → VCC (40), − → GND (20)
+- EA (31) → VCC
+- VCC → 1 kΩ 电阻 → c.led.name 阳极（+，长脚）, 阴极（−） → P1.0 (1)
+
+**相关用法:** 数字输出与 LED 限流电阻 · 供电方式
+
+```cpp
+// 8051 Blink: an LED from VCC through 1 kOhm to P1.0 (the port can only pull LOW strongly) - on when P1.0 = 0.
+#include <reg52.h>
+
+sbit LED = P1^0;
+
+// software delay: at 11.0592 MHz one pass of the inner loop takes about 8.7 us, 114 passes = 1 ms
+void delay_ms(unsigned int ms) {
+  unsigned int i, j;
+  for (i = ms; i > 0; i--)
+    for (j = 114; j > 0; j--);
+}
+
+void main() {
+  while (1) {
+    LED = 0;          // on
+    delay_ms(500);
+    LED = 1;          // off
+    delay_ms(500);
+  }
+}
+```
+
+<a id="ex-c51run"></a>
+
+#### 单片机：8051 流水灯 (P1 口 + 按键换向)
+
+P1 口 8 个低电平点亮的 LED 显示一个移动的点（P1 = pattern，用 _crol_ / _cror_ 循环移位）；P3.2 到 GND 的按键改变方向，靠准双向口的上拉读取。
+
+**接线**
+
+- 电池 5 V: + → VCC (40), − → GND (20)
+- EA (31) → VCC
+- VCC → 1 kΩ 电阻 ×8 → LED 光柱 (10 段) 阳极（+，长脚）
+- LED 光柱 (10 段) 阴极（−） → P1.7 … P1.0 (8 … 1)
+- 按钮: P3.2 (12) → GND
+
+**相关用法:** 数字输出与 LED 限流电阻 · 按键输入：上拉、下拉与消抖
+
+```cpp
+// 8051 running light: 8 LEDs on P1, active LOW (VCC -> 1 kOhm -> LED -> P1.x).
+// The button on P3.2 (to GND) reverses the direction. Crystal 11.0592 MHz.
+#include <reg52.h>
+#include <intrins.h>
+
+sbit KEY = P3^2;
+
+void delay_ms(unsigned int ms) {      // about 1 ms per outer pass at 11.0592 MHz
+  unsigned int i, j;
+  for (i = ms; i > 0; i--)
+    for (j = 114; j > 0; j--);
+}
+
+void main() {
+  unsigned char pattern = 0xFE;     // one bit LOW = one LED on
+  bit left = 1;
+  while (1) {
+    P1 = pattern;
+    delay_ms(150);
+    if (KEY == 0) {                 // pressed: reverse the direction
+      left = !left;
+      while (KEY == 0);             // wait until released
+    }
+    if (left) pattern = _crol_(pattern, 1);
+    else pattern = _cror_(pattern, 1);
+  }
 }
 ```
 
