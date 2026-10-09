@@ -174,7 +174,7 @@ const MCULANG = (() => {
         const params = mm[2] !== undefined ? mm[3].split(',').map((s) => s.trim()).filter((s) => s) : null;
         macros.set(mm[1], { params, body: subLex(mm[4], t.line) });
       } else if (dir === 'undef') macros.delete(rest.trim());
-      else if (dir === 'include') includes.push(rest.replace(/[<>"]/g, '').trim());
+      else if (dir === 'include') { const h = rest.replace(/[<>"]/g, '').trim(); includes.push(h); if (WIFI_INC.has(h.toLowerCase())) fail(t.line, 'nowifi', { name: h }); }
       else if (dir === 'pragma' || dir === 'warning' || dir === 'line' || dir === '') { /* ignored */ }
       else if (dir === 'error') fail(t.line, 'pp', { dir: '#error ' + rest });
       else fail(t.line, 'pp', { dir: '#' + dir });
@@ -217,6 +217,19 @@ const MCULANG = (() => {
     'String', 'size_t', 'uint8_t', 'int8_t', 'uint16_t', 'int16_t', 'uint32_t', 'int32_t', 'uint64_t', 'int64_t', 'Servo', 'LiquidCrystal', 'DHT', 'OneWire', 'DallasTemperature', 'LiquidCrystal_I2C']);
   const OBJW = new Set(['Servo', 'LiquidCrystal', 'DHT', 'OneWire', 'DallasTemperature', 'LiquidCrystal_I2C']);   // library classes (no functional cast)
   const QUALW = new Set(['const', 'static', 'volatile', 'constexpr', 'inline', 'extern', 'register', 'unsigned', 'signed']);
+  // v12: per-compile board options (set by compile() from consts.__opt): 32-bit int (ESP32 / RP2040 / STM32), 8051 dialect
+  let OPT = { board: '', int32: false, c51: false, res: false };
+  const C51Q = new Set(['code', 'data', 'idata', 'xdata', 'pdata', 'bdata', 'small', 'compact', 'large', 'reentrant']);
+  const C51_SFR_NO = new Set(['TMOD', 'TCON', 'TH0', 'TL0', 'TH1', 'TL1', 'TH2', 'TL2', 'T2CON', 'RCAP2H', 'RCAP2L', 'TR0', 'TR1', 'TR2', 'TF0', 'TF1', 'TF2', 'IE', 'IP', 'EA', 'ET0', 'ET1', 'ET2', 'EX0', 'EX1', 'ES',
+    'IT0', 'IT1', 'IE0', 'IE1', 'SCON', 'SBUF', 'TI', 'RI', 'REN', 'SM0', 'SM1', 'SM2', 'PCON', 'ACC', 'B', 'PSW', 'SP', 'DPL', 'DPH', 'AUXR', 'WDT_CONTR', 'ISP_CONTR']);
+  const C51_BAN = new Set(['pinMode', 'digitalWrite', 'digitalRead', 'analogRead', 'analogWrite', 'analogReference', 'tone', 'noTone', 'pulseIn', 'shiftOut', 'shiftIn',
+    'analogReadResolution', 'analogWriteResolution', 'analogWriteRange', 'analogWriteFreq', 'dacWrite', 'ledcSetup', 'ledcAttachPin', 'ledcAttach', 'ledcWrite', 'touchRead', 'analogReadMilliVolts']);
+  const ESP_API = new Set(['dacWrite', 'ledcSetup', 'ledcAttachPin', 'ledcAttach', 'ledcWrite', 'touchRead', 'analogReadMilliVolts']);
+  const RES_API = new Set(['analogReadResolution', 'analogWriteResolution']);
+  const PICO_API = new Set(['analogWriteRange', 'analogWriteFreq']);
+  const WIFI_INC = new Set(['wifi.h', 'wificlient.h', 'wifiserver.h', 'wifiudp.h', 'wifimulti.h', 'webserver.h', 'httpclient.h', 'bluetoothserial.h', 'bledevice.h', 'bleserver.h', 'bleutils.h',
+    'esp_now.h', 'espmdns.h', 'arduinoota.h', 'pubsubclient.h', 'asynctcp.h', 'espasyncwebserver.h', 'esp8266wifi.h', 'wificlientsecure.h', 'esp_wifi.h', 'btstack.h']);
+  const WIFI_IDS = new Set(['WiFi', 'WiFiClient', 'WiFiServer', 'WiFiUDP', 'WiFiMulti', 'WebServer', 'HTTPClient', 'BluetoothSerial', 'BLEDevice', 'esp_now_init', 'esp_now_send', 'WiFiClientSecure']);
   const UNSUP_KW = new Set(['struct', 'class', 'union', 'typedef', 'template', 'goto', 'namespace', 'using', 'new', 'delete', 'auto', 'operator', 'virtual', 'asm', 'try', 'throw']);
 
   // ------------------------------------------------------------------ parser --------------------------------------
@@ -242,7 +255,7 @@ const MCULANG = (() => {
     ident() { const t = this.p; if (t.t !== 'id') fail(t.line, t.t === 'eof' ? 'eof' : 'expected', { want: 'identifier', got: this.tokText(t) }); return this.next().v; }
     isTypeStart(k) {
       const t = this.peek(k || 0);
-      return t.t === 'id' && (BASEW.has(t.v) || QUALW.has(t.v) || this.types.has(t.v));
+      return t.t === 'id' && (BASEW.has(t.v) || QUALW.has(t.v) || this.types.has(t.v) || (OPT.c51 && (t.v === 'bit' || C51Q.has(t.v))));
     }
     // type specifier → {ty, konst, stat} or null
     typeSpec() {
@@ -253,6 +266,8 @@ const MCULANG = (() => {
         if (v === 'const' || v === 'constexpr') konst = true;
         else if (v === 'static') stat = true;
         else if (v === 'volatile' || v === 'inline' || v === 'extern' || v === 'register') { /* ignored */ }
+        else if (OPT.c51 && C51Q.has(v)) { /* 8051 memory-space qualifiers (code / xdata …): ignored */ }
+        else if (OPT.c51 && v === 'bit') { if (base) break; base = 'bool'; }
         else if (v === 'unsigned') uns = true;
         else if (v === 'signed') uns = false;
         else if (v === 'long') longs++;
@@ -262,6 +277,7 @@ const MCULANG = (() => {
         any = true; this.next();
       }
       if (!any) return null;
+      if (OPT.c51 && OBJW.has(base)) fail(line, 'c51_api', { name: base });
       let ty;
       switch (base) {
         case 'char': ty = uns === true ? T.u8 : uns === false ? T.i8 : T.char; break;
@@ -285,7 +301,7 @@ const MCULANG = (() => {
         case 'enum': ty = T.i16; break;
         default:
           if (base === null && !(uns !== null || longs || short)) return null;
-          ty = longs >= 2 ? T.i64 : longs === 1 ? (uns ? T.u32 : T.i32) : (uns ? T.u16 : T.i16);
+          ty = longs >= 2 ? T.i64 : longs === 1 || (OPT.int32 && !short) ? (uns ? T.u32 : T.i32) : (uns ? T.u16 : T.i16);
       }
       return { ty, konst, stat, line };
     }
@@ -468,12 +484,18 @@ const MCULANG = (() => {
         if (t.t === 'op' && t.v === ';') { this.next(); continue; }
         if (t.t === 'id' && t.v === 'enum') { items.push(this.enumDecl()); continue; }
         if (t.t === 'id' && UNSUP_KW.has(t.v)) fail(t.line, 'unsupported', { what: t.v });
+        if (t.t === 'id' && WIFI_IDS.has(t.v)) fail(t.line, 'nowifi', { name: t.v });
+        if (t.t === 'id' && OPT.c51 && (t.v === 'sbit' || t.v === 'sfr' || t.v === 'sfr16')) {
+          this.next(); const name = this.ident(); this.expect('='); const e = this.parseExpr(); this.expect(';');
+          items.push({ k: t.v === 'sbit' ? 'sbit' : 'sfr', name, e, line: t.line }); continue;
+        }
         const spec = this.typeSpec();
         if (!spec) fail(t.line, t.t === 'id' ? 'unknown_type' : 'unexpected', { tok: this.tokText(t), name: t.v });
         // function?
         if (spec.ty.k !== 'obj' && this.p.t === 'id' && this.isOp('(', 1)) {
           const line = this.p.line, name = this.next().v; this.next();
           const ps = this.params();
+          if (this.p.t === 'id' && (this.p.v === 'interrupt' || this.p.v === 'using')) fail(this.p.line, 'unsupported', { what: 'interrupt (8051 ISR)' });
           if (this.accept(';')) { items.push({ k: 'proto', name, ret: spec.ty, params: ps, line }); continue; }
           if (!this.isOp('{')) fail(this.p.line, 'expected', { want: '{', got: this.tokText(this.p) });
           const body = this.block();
@@ -709,8 +731,12 @@ const MCULANG = (() => {
     exId(e) {
       const s = this.look(e.name);
       if (s) {
+        if (s.sfr !== undefined) return { c: `__R.sfrR(${s.sfr}, ${s.bit})`, ty: s.ty };
         if (s.kind === 'var') return { c: s.js, ty: s.ty, simple: true, lit: s.cv };
       }
+      if (WIFI_IDS.has(e.name)) fail(e.line, 'nowifi', { name: e.name });
+      if (/^Serial[1-3]$/.test(e.name)) fail(e.line, 'noserialn', { name: e.name });
+      if (OPT.c51 && C51_SFR_NO.has(e.name)) fail(e.line, 'c51_sfr', { name: e.name });
       if (this.funcs.has(e.name) || API_NAMES.has(e.name)) fail(e.line, 'unsupported', { what: 'function pointer' });
       const c = this.consts[e.name];
       if (c) return { c: numLit(c.v), ty: c.ty, lit: c.v };
@@ -770,6 +796,8 @@ const MCULANG = (() => {
     lval(e) {
       if (e.k === 'id') {
         const s = this.look(e.name);
+        if (s && s.sfr !== undefined) return { pre: '', get: `__R.sfrL(${s.sfr}, ${s.bit})`, set: (c) => `__R.sfrW(${s.sfr}, ${s.bit}, ${c})`, ty: s.ty };
+        if (OPT.c51 && C51_SFR_NO.has(e.name)) fail(e.line, 'c51_sfr', { name: e.name });
         if (!s || s.kind !== 'var') { if (this.consts[e.name] || !s) { if (!this.consts[e.name] && !this.funcs.has(e.name)) fail(e.line, 'undeclared', { name: e.name }); } fail(e.line, 'not_lvalue'); }
         if (s.konst) fail(e.line, 'const_assign', { name: e.name });
         if (s.ty.k === 'arr' || s.ty.k === 'obj') fail(e.line, 'not_lvalue');
@@ -844,7 +872,26 @@ const MCULANG = (() => {
       const N = (lo, hi) => this.numArgs(e, A(lo, hi));
       const Y = (c, ty) => ({ c: `(yield* ${c})`, ty: ty || T.void });
       const mty = (vs) => (vs.some((v) => v.ty.k === 'float') ? T.f : promote(...vs.map((v) => v.ty).slice(0, 2)));
+      if (OPT.c51 && C51_BAN.has(name)) fail(e.line, 'c51_api', { name: name + '()' });
+      if (ESP_API.has(name) && OPT.board !== 'esp32') fail(e.line, 'board_api', { name: name + '()' });
+      if (RES_API.has(name) && !OPT.res) fail(e.line, 'board_api', { name: name + '()' });
+      if (PICO_API.has(name) && OPT.board !== 'pico') fail(e.line, 'board_api', { name: name + '()' });
+      if (WIFI_IDS.has(name)) fail(e.line, 'nowifi', { name });
       switch (name) {
+        case 'analogReadResolution': return { c: `__R.arRes(${N(1)})`, ty: T.void };
+        case 'analogWriteResolution': return { c: `__R.awRes(${N(1)})`, ty: T.void };
+        case 'analogWriteRange': return { c: `__R.awRange(${N(1)})`, ty: T.void };
+        case 'analogWriteFreq': return { c: `__R.awFreq(${N(1)})`, ty: T.void };
+        case 'dacWrite': return Y(`__R.dac(${N(2).join(', ')})`);
+        case 'ledcSetup': return { c: `__R.ledcSetup(${N(3).join(', ')})`, ty: T.u32 };
+        case 'ledcAttachPin': return { c: `__R.ledcAttachPin(${N(2).join(', ')})`, ty: T.void };
+        case 'ledcAttach': return { c: `__R.ledcAttach(${N(3).join(', ')})`, ty: T.bool };
+        case 'ledcWrite': return Y(`__R.ledcWrite(${N(2).join(', ')})`);
+        case 'touchRead': return { c: `__R.touch(${N(1)})`, ty: T.u16 };
+        case 'analogReadMilliVolts': return { c: `__R.arMv(${N(1)})`, ty: T.u32 };
+        case 'delay_ms': if (OPT.c51) return Y(`__R.dly(${N(1)})`); break;
+        case '_nop_': if (OPT.c51) { A(0); return { c: '__R.nop()', ty: T.void }; } break;
+        case '_crol_': case '_cror_': if (OPT.c51) { const a = N(2); const l = name === '_crol_'; return { c: `((((${a[0]}) & 255) ${l ? '<<' : '>>'} ((${a[1]}) & 7) | ((${a[0]}) & 255) ${l ? '>>' : '<<'} (8 - ((${a[1]}) & 7))) & 255)`, ty: T.u8 }; } break;
         case 'pinMode': return Y(`__R.pm(${N(2).join(', ')})`);
         case 'digitalWrite': return Y(`__R.dw(${N(2).join(', ')})`);
         case 'digitalRead': return { c: `__R.dr(${N(1)})`, ty: T.i16 };
@@ -928,6 +975,7 @@ const MCULANG = (() => {
         }
         fail(e.line, 'unknown_member', { name: m, obj: 'Wire' });
       }
+      if (o.k === 'id' && /^Serial[1-3]$/.test(o.name) && !this.look(o.name)) fail(e.line, 'noserialn', { name: o.name });   // v12: Mega / ESP32 extra UARTs
       if (o.k === 'id' && o.name === 'Serial' && !this.look('Serial')) {
         switch (m) {
           case 'begin': A(1, 2); return { c: '__R.sb()', ty: T.void };
@@ -1203,7 +1251,23 @@ const MCULANG = (() => {
       // pass 2: globals and enums in order; functions bodies afterwards so every global is visible (globals declared
       // after a function are still found because bodies are compiled last)
       this.fn = { ret: T.void, tmps: [] };
+      if (OPT.c51) {
+        for (let p = 0; p < 4; p++) {
+          this.scopes[0].set('P' + p, { kind: 'var', sfr: p, bit: -1, ty: T.u8 });
+          for (let b = 0; b < 8; b++) this.scopes[0].set('P' + p + '_' + b, { kind: 'var', sfr: p, bit: b, ty: T.bool });
+        }
+      }
       for (const it of items) {
+        if (it.k === 'sbit') {
+          const e = it.e; let port = null, bit = null;
+          if (e.k === 'bin' && e.op === '^' && e.a.k === 'id' && /^P[0-3]$/.test(e.a.name)) { port = +e.a.name[1]; bit = this.fold(e.b); }
+          else if (e.k === 'id' && /^P[0-3]_[0-7]$/.test(e.name)) { port = +e.name[1]; bit = +e.name[3]; }
+          if (port === null || bit === null || bit < 0 || bit > 7) fail(it.line, 'c51_sfr', { name: it.name });
+          if (this.scopes[0].has(it.name) && !/^P[0-3]_[0-7]$/.test(it.name)) fail(it.line, 'redeclared', { name: it.name });
+          this.scopes[0].set(it.name, { kind: 'var', sfr: port, bit, ty: T.bool });
+          continue;
+        }
+        if (it.k === 'sfr') { if (!/^P[0-3]$/.test(it.name)) fail(it.line, 'c51_sfr', { name: it.name }); continue; }
         if (it.k === 'decl') this.decl(it, true);
         else if (it.k === 'enum') {
           let next = 0;
@@ -1228,6 +1292,14 @@ const MCULANG = (() => {
         fcode.push(`function* $${it.name}(${it.params.map((p) => '$' + p.name).join(', ')}) {\n${tmps}__R.tp += 5e-7;\n${b}\n${it.ret.k === 'void' ? '' : it.ret.k === 'str' ? "return '';" : 'return 0;'}\n}`);
       }
       for (const [name, f] of this.funcs) if (!f.defined) fail(items.find((x) => x.name === name).line, 'undefined_func', { name });
+      const mn = this.funcs.get('main');
+      if (OPT.c51 && mn && !this.funcs.get('setup')) {
+        if (mn.params.length) fail(1, 'no_main');
+        return "'use strict';\n" + (this.globals.length ? `let ${this.globals.join(', ')};\n` : '') +
+          `function* __init() {\n${initTmps.length ? `let ${initTmps.join(', ')};\n` : ''}${this.ginit.join('\n')}\n}\n` + fcode.join('\n') +
+          '\nfunction* __idle() { }\nreturn { init: __init, setup: $main, loop: __idle, main: true };';
+      }
+      if (OPT.c51 && !mn) fail(1, 'no_main');
       const st = this.funcs.get('setup'), lp = this.funcs.get('loop');
       if (!st || !lp) fail(1, 'no_setup_loop');
       if (st.params.length || lp.params.length) fail(1, 'no_setup_loop');
@@ -1385,10 +1457,12 @@ const MCULANG = (() => {
   const JS_HEADER_LINES = 3;   // `function anonymous(...\n) {\n"use strict";\n` precede user line 1
 
   // ------------------------------------------------------------------ public entry --------------------------------
-  const KNOWN_INC = new Set(['arduino.h', 'servo.h', 'liquidcrystal.h', 'avr/io.h', 'dht.h', 'onewire.h', 'dallastemperature.h', 'wire.h', 'liquidcrystal_i2c.h', 'avr/pgmspace.h', 'math.h', 'stdlib.h', 'string.h', 'stdint.h', 'stdio.h', 'util/delay.h']);
+  const KNOWN_INC = new Set(['reg51.h', 'reg52.h', 'at89x51.h', 'at89x52.h', 'intrins.h', '8051.h', '8052.h', 'stc89c5xrc.rdp', 'esp32-hal.h', 'arduino.h', 'servo.h', 'liquidcrystal.h', 'avr/io.h', 'dht.h', 'onewire.h', 'dallastemperature.h', 'wire.h', 'liquidcrystal_i2c.h', 'avr/pgmspace.h', 'math.h', 'stdlib.h', 'string.h', 'stdint.h', 'stdio.h', 'util/delay.h']);
   const cache = new Map();
   function compile(src, lang, consts) {
-    const key = lang + '\u0000' + JSON.stringify(Object.keys(consts || {}).length) + '\u0000' + src;
+    const o = (consts && consts.__opt) || {};
+    OPT = { board: o.board || '', int32: !!o.int32, c51: !!o.c51, res: !!o.res };
+    const key = lang + '\u0000' + (o.board || Object.keys(consts || {}).length) + '\u0000' + src;
     if (cache.has(key)) return cache.get(key);
     let res;
     try {
@@ -1396,7 +1470,7 @@ const MCULANG = (() => {
         const code = instrumentJS(src);
         let factory;
         try {
-          factory = new Function('__R', ...JS_API, ...JS_SHADOW, '"use strict";\n' + code +
+          factory = new Function('__R', ...JS_API, ...JS_SHADOW, ...(o.jsExtra || []), '"use strict";\n' + code +
             '\n;return { setup: typeof setup === "function" ? setup : null, loop: typeof loop === "function" ? loop : null };');
         } catch (err) {
           res = { ok: false, error: { line: jsSyntaxLine(code, err), key: 'syntax', params: { msg: String(err.message) } } };

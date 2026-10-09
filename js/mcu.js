@@ -27,6 +27,19 @@ const MCU = (() => {
     for (const [k, v] of Object.entries(extra)) o[k] = C16(v);
     return o;
   }
+  // v12: every board carries its electrical / timing parameters (defaults = the ATmega328P values used since v10)
+  const BOARD_DEFAULTS = {
+    rOut: 25, rPu: 35e3, rPd: 0, vil: 0.3, vih: 0.6, vBoot: 2.7, vOff: 2.4, tpBack: 2.5e-7, tpIo: 3.5e-6, tpAdc: 1.12e-4,
+    adcBits: 10, adcRef: 0, pwmBits: 8, pwmAll: 0, pwmFreq: 0, iMax: 0.04, i2c: [18, 19], inOnly: null, dac: null, touch: null,
+    label: (n) => 'pin ' + n, intRange: 16,
+  };
+  const boardOpts = (id, B) => ({ board: id, int32: B.intRange === 32, c51: !!B.c51, res: !!B.res, jsExtra: Object.keys(B.jsConsts).filter((k) => !MCULANG.JS_API.includes(k)) });
+  function addBoard(id, B) {
+    for (const [k, v] of Object.entries(BOARD_DEFAULTS)) if (B[k] === undefined) B[k] = v;
+    B.consts.__opt = boardOpts(id, B);
+    BOARDS[id] = B;
+    return B;
+  }
   const BOARDS = {
     arduino: {
       n: 20, names: [...Array.from({ length: 14 }, (_, i) => 'D' + i), 'A0', 'A1', 'A2', 'A3', 'A4', 'A5'],
@@ -43,13 +56,15 @@ const MCU = (() => {
       pinOf: (p) => (p >= 0 && p < 6 ? p : p >= 128 && p < 132 ? [5, 2, 4, 3][p - 128] : -1), vcc: 7, gnd: 3,
       consts: mkConsts({ LED_BUILTIN: 1, A0: 128, A1: 129, A2: 130, A3: 131, PB0: 0, PB1: 1, PB2: 2, PB3: 3, PB4: 4, PB5: 5 }),
       jsConsts: { LED_BUILTIN: 1, A0: 128, A1: 129, A2: 130, A3: 131, PB0: 0, PB1: 1, PB2: 2, PB3: 3, PB4: 4, PB5: 5 },
+      i2c: [0, 2],
     },
   };
+  for (const [id, B] of Object.entries(BOARDS)) addBoard(id, B);
 
   // ---------------------------------------------------------------- runtime --------------------------------------
   class McuRT {
     constructor(c, app, t) {
-      const B = BOARDS[c.type];
+      const B0 = BOARDS[c.type], B = B0.forProps ? B0.forProps(c.props) : B0;   // per-instance variant (Pro Mini 8 MHz, 8051 crystal)
       this.c = c; this.app = app; this.B = B; this.n = B.n;
       this.tp = t; this.tBoot = t; this.tnow = t; this.lim = t; this.minsp = 2e-6;
       this.ln = 0; this.ops = 0; this.pend = []; this.pn = 0; this.hw = [];
@@ -62,9 +77,11 @@ const MCU = (() => {
       c.state.ser = c.state.ser || ''; c.state.sin = [];
       this.sin = c.state.sin;
       this.servos = []; this.toneCh = null;
+      this.adcRes = B.adcBits; this.pwmRange = (1 << B.pwmBits) - 1; this.pwmF = {}; this.hDac = {}; this.ledc = { chMode: false, ch: {}, pin: {} };
       this.compiled = MCULANG.compile(this.src || '', this.lang === 'js' ? 'js' : 'ino', B.consts);
+      if (B.c51) { this.latch = [0, 0, 0, 0]; for (let q = 0; q < 4; q++) this.sfrW(q, -1, 255); this.tp = t; }   // 8051 reset: all port latches = 0xFF
       if (!this.compiled.ok) { this.err = Object.assign({ compile: true }, this.compiled.error); return; }
-      try { this.P = this.lang === 'js' ? this.compiled.factory(this, ...this.jsApi()) : this.compiled.factory(this); }
+      try { this.P = this.lang === 'js' ? this.compiled.factory(this, ...this.jsApi(), ...B.consts.__opt.jsExtra.map((k) => B.jsConsts[k])) : this.compiled.factory(this); }
       catch (e) { this.fault(e); return; }
       this.gen = this.main();
     }
@@ -120,6 +137,7 @@ const MCU = (() => {
     }
     // ---- electrical side
     driveOf(p) {
+      if (this.hDac[p] !== undefined && this.hMode[p] === 1) return this.hDac[p];
       for (const s of this.servos) if (s.ch && s.ch.pin === p) return s.ch.level;
       if (this.toneCh && this.toneCh.pin === p) return this.toneCh.avg ? 0.5 : this.toneCh.level;
       if (this.hMode[p] === 1) {
@@ -127,15 +145,17 @@ const MCU = (() => {
         if (ch) return ch.avg ? ch.duty : ch.level;
         return this.hOut[p] ? 1 : 0;
       }
-      return this.hOut[p] ? -2 : -1;
+      return this.hOut[p] === 1 ? -2 : this.hOut[p] === 2 ? -3 : -1;
     }
+    freqOf(p) { return this.pwmF[p] || this.B.pwm[p] || (this.B.pwmAll && !(this.B.inOnly && this.B.inOnly.includes(p)) ? this.B.pwmFreq : 0); }
     sync(t) { for (let p = 0; p < this.n; p++) setDrive(this.c, p, this.driveOf(p), t, this.app); }
     pwmCh(p) { for (const ch of this.hw) if (ch.kind === 'pwm' && ch.pin === p) return ch; return null; }
     dropCh(ch) { const i = this.hw.indexOf(ch); if (i >= 0) this.hw.splice(i, 1); }
     hwSet(p, mode, out, duty, t) {
       this.hMode[p] = mode; this.hOut[p] = out;
-      const f = this.B.pwm[p];
+      const f = this.freqOf(p);
       let ch = this.pwmCh(p);
+      if (ch && ch.T !== 1 / f) { this.dropCh(ch); ch = null; }
       if (mode === 1 && duty >= 0 && f) {
         const T = 1 / f;
         if (!ch) {
@@ -167,38 +187,103 @@ const MCU = (() => {
       } else if (ch) this.dropCh(ch);
     }
     // ---- helpers used by the generated code
-    pin(p) { return this.B.pinOf(Math.trunc(+p)); }
-    bk() { this.tp += TP_BACK; return this.tp >= this.lim || this.pn > 0; }
-    g() { if (++this.ops > BUDGET) throw new RtErr('runaway'); this.tp += TP_BACK; }
+    pin(p) { const n = Math.trunc(+p), k = this.B.pinOf(n); if (k < 0) throw new RtErr(this.B.flash && this.B.flash.includes(n) ? 'nopin_flash' : 'nopin', { pin: this.B.label(n) }); return k; }
+    dpin(p) { const k = this.pin(p); if (this.B.anaOnly && this.B.anaOnly[k]) throw new RtErr('anaonly', { pin: this.B.anaOnly[k] }); return k; }
+    bk() { this.tp += this.B.tpBack; return this.tp >= this.lim || this.pn > 0; }
+    g() { if (++this.ops > BUDGET) throw new RtErr('runaway'); this.tp += this.B.tpBack; }
     run(it) { if (it && typeof it.next === 'function') { let r; while (!(r = it.next()).done) { this.g(); } return r.value; } return it; }
     *yld() { if (this.tp >= this.lim || this.pn) yield 0; }
     *pm(p, m) {
-      this.tp += TP_IO; const k = this.pin(p);
+      this.tp += this.B.tpIo; const k = this.dpin(p);
       if (k >= 0) {
         m = Math.trunc(+m);
-        if (m === 1) this.modeP[k] = 1; else { this.modeP[k] = 0; this.outP[k] = m === 2 ? 1 : 0; }
+        const io = this.B.inOnly && this.B.inOnly.includes(k);
+        if (m >= 1 && m <= 3 && io) throw new RtErr('inonly', { pin: this.B.names[k] }); // GPIO34–39: no output driver, no internal pull resistors
+        if (m === 3 && !this.B.rPd) throw new RtErr('nopulldown', {});
+        if (m === 1) this.modeP[k] = 1; else { this.modeP[k] = 0; this.outP[k] = io ? 0 : m === 2 ? 1 : m === 3 ? 2 : 0; }
         this.pwmOff(k); this.apply(k);
       }
       if (this.tp >= this.lim || this.pn) yield 0;
     }
     *dw(p, v) {
-      this.tp += TP_IO; const k = this.pin(p);
-      if (k >= 0) { this.outP[k] = v ? 1 : 0; this.pwmOff(k); this.apply(k); }
+      this.tp += this.B.tpIo; const k = this.dpin(p);
+      if (k >= 0) { if (this.modeP[k] === 0 && this.B.inOnly && this.B.inOnly.includes(k)) throw new RtErr('inonly', { pin: this.B.names[k] }); this.outP[k] = v ? 1 : 0; this.pwmOff(k); this.apply(k); }
       if (this.tp >= this.lim || this.pn) yield 0;
     }
     *aw(p, v) {
-      this.tp += TP_IO; const k = this.pin(p);
+      this.tp += this.B.tpIo; const k = this.dpin(p);
       if (k >= 0) {
-        v = Math.trunc(+v) || 0; this.modeP[k] = 1;
+        if (this.B.inOnly && this.B.inOnly.includes(k)) throw new RtErr('inonly', { pin: this.B.names[k] });
+        v = Math.trunc(+v) || 0; this.modeP[k] = 1; const top = this.pwmRange;
         if (v <= 0) { this.outP[k] = 0; this.pwmOff(k); }
-        else if (v >= 255) { this.outP[k] = 1; this.pwmOff(k); }
-        else if (this.B.pwm[k]) { this.outP[k] = 0; this.duty = this.duty || {}; this.duty[k] = v / 255; }
-        else { this.outP[k] = v < 128 ? 0 : 1; this.pwmOff(k); }
+        else if (v >= top) { this.outP[k] = 1; this.pwmOff(k); }
+        else if (this.freqOf(k)) { this.outP[k] = 0; this.duty = this.duty || {}; this.duty[k] = v / top; }
+        else { this.outP[k] = v < (top + 1) / 2 ? 0 : 1; this.pwmOff(k); }
         this.apply(k);
       }
       if (this.tp >= this.lim || this.pn) yield 0;
     }
-    pwmOff(k) { if (this.duty) delete this.duty[k]; }
+    pwmOff(k) { if (this.duty) delete this.duty[k]; if (this.dacK && this.dacK[k] !== undefined) { delete this.dacK[k]; this.at(() => { delete this.hDac[k]; }); } }
+    // ---- v12 board extras: ADC / PWM resolution, ESP32 DAC, LEDC PWM and touch pins, 8051 ports
+    arRes(b) { this.adcRes = U.clamp(Math.trunc(+b) || 10, 1, 16); }
+    awRes(b) { this.pwmRange = (1 << U.clamp(Math.trunc(+b) || 8, 1, 16)) - 1; }
+    awRange(r) { this.pwmRange = U.clamp(Math.trunc(+r) || 255, 16, 65535); }
+    awFreq(f) { f = U.clamp(+f || 1000, 100, 1e6); for (let k = 0; k < this.n; k++) if (this.freqOf(k)) this.pwmF[k] = f; this.B_pwmFreq = f; }
+    *dac(p, v) {
+      this.tp += this.B.tpIo; const k = this.pin(p);
+      if (!this.B.dac || !this.B.dac.includes(k)) throw new RtErr('nodac', { pin: this.B.label(Math.trunc(+p)) });
+      const d = U.clamp(Math.trunc(+v) || 0, 0, 255) / 255;
+      this.modeP[k] = 1; this.outP[k] = 0; if (this.duty) delete this.duty[k];
+      this.dacK = this.dacK || {}; this.dacK[k] = d;
+      this.at((t) => { this.hDac[k] = d; this.hwSet(k, 1, 0, -1, t); });
+      if (this.tp >= this.lim || this.pn) yield 0;
+    }
+    ledcSetup(ch, f, bits) { this.ledc.chMode = true; this.ledc.ch[Math.trunc(ch)] = { f: +f, bits: Math.trunc(bits) }; return +f; }
+    ledcAttachPin(p, ch) { const k = this.pin(p); this.ledc.pin[k] = Math.trunc(ch); }
+    ledcAttach(p, f, bits) { const k = this.pin(p); if (this.B.inOnly.includes(k)) throw new RtErr('inonly', { pin: this.B.names[k] }); this.ledc.pin[k] = { f: +f, bits: Math.trunc(bits) }; return true; }
+    *ledcWrite(x, duty) {
+      this.tp += this.B.tpIo; x = Math.trunc(+x);
+      const L = this.ledc, list = [];
+      if (L.chMode) { const c = L.ch[x]; if (c) for (const [k, ch] of Object.entries(L.pin)) if (ch === x) list.push([+k, c]); }
+      else { const k = this.pin(x); if (L.pin[k] && typeof L.pin[k] === 'object') list.push([k, L.pin[k]]); }
+      for (const [k, c] of list) {
+        const top = 1 << c.bits, d = U.clamp(+duty, 0, top) / top;
+        this.modeP[k] = 1; this.pwmF[k] = c.f;
+        if (d <= 0) { this.outP[k] = 0; this.pwmOff(k); } else if (d >= 1) { this.outP[k] = 1; this.pwmOff(k); } else { this.outP[k] = 0; this.duty = this.duty || {}; this.duty[k] = d; }
+        this.apply(k);
+      }
+      if (this.tp >= this.lim || this.pn) yield 0;
+    }
+    touch(p) {
+      this.tp += 5e-4; const n = Math.trunc(+p), k = this.pin(n);
+      if (!this.B.touch || this.B.touch[k] === undefined) throw new RtErr('notouch', { pin: this.B.label(n) });
+      return String(this.c.props.touch) === String(k) ? 12 : 75;     // typical raw counts: ≈ 70–80 untouched, far lower when touched
+    }
+    arMv(p) { const raw = this.ar(p), bits = this.adcRes; return Math.round(raw / ((1 << bits) - 1) * this.adcFull() * 1000); }
+    adcFull() { const c = this.c, m = this.app.net; if (this.B.adcRef) return this.B.adcRef; if (!m || !c._nodes) return 5; const n = c._nodes; return Math.max(m.v(n[this.B.vcc]) - m.v(n[this.B.gnd]), 0.5); }
+    nop() { this.tp += this.B.tpIo; }
+    // 8051 ports: bit 1 = quasi-bidirectional weak pull-up (P0: open drain, floating), bit 0 = strong low
+    sfrW(port, bit, v) {
+      const base = port * 8; v = Math.trunc(+v) || 0; this.tp += this.B.tpIo;
+      if (!this.latch) this.latch = [255, 255, 255, 255];
+      let L = this.latch[port];
+      if (bit < 0) L = v & 255; else L = v ? L | (1 << bit) : L & ~(1 << bit);
+      this.latch[port] = L;
+      for (let b = 0; b < 8; b++) {
+        if (bit >= 0 && b !== bit) continue;
+        const k = base + b, one = (L >> b) & 1;
+        const nm = one ? 0 : 1, no = one ? (port === 0 ? 0 : 1) : 0;
+        if (this.modeP[k] !== nm || this.outP[k] !== no) { this.modeP[k] = nm; this.outP[k] = no; this.apply(k); }
+      }
+      return bit < 0 ? v & 255 : v ? 1 : 0;
+    }
+    sfrL(port, bit) { const L = this.latch ? this.latch[port] : 255; return bit < 0 ? L : (L >> bit) & 1; }
+    sfrR(port, bit) {
+      this.tp += this.B.tpIo; const L = this.latch ? this.latch[port] : 255;
+      if (bit >= 0) return ((L >> bit) & 1) && this.level(port * 8 + bit) ? 1 : 0;
+      let v = 0; for (let b = 0; b < 8; b++) if (((L >> b) & 1) && this.level(port * 8 + b)) v |= 1 << b;
+      return v;
+    }
     apply(k) {
       const mode = this.modeP[k], out = this.outP[k], duty = this.duty && this.duty[k] !== undefined ? this.duty[k] : -1;
       this.at((t) => this.hwSet(k, mode, out, duty, t));
@@ -206,20 +291,21 @@ const MCU = (() => {
     level(k) {   // logic level seen by the input buffer (Schmitt-like thresholds 0.3 / 0.6 VCC)
       const c = this.c, m = this.app.net; if (!m || !c._nodes) return 0;
       const n = c._nodes, g = m.v(n[this.B.gnd]), vcc = Math.max(m.v(n[this.B.vcc]) - g, 0.1), v = m.v(n[this.B.term(k)]) - g;
-      if (v > 0.6 * vcc) this.inLvl[k] = 1; else if (v < 0.3 * vcc) this.inLvl[k] = 0;
+      if (v > this.B.vih * vcc) this.inLvl[k] = 1; else if (v < this.B.vil * vcc) this.inLvl[k] = 0;
       return this.inLvl[k];
     }
     dr(p) {
-      this.tp += TP_IO; const k = this.pin(p); if (k < 0) return 0;
+      this.tp += this.B.tpIo; const k = this.dpin(p); if (k < 0) return 0;
       if (this.modeP[k] === 1) return this.outP[k];
       return this.level(k);
     }
     ar(p) {
-      this.tp += TP_ADC; const k = this.B.adc(Math.trunc(+p)); if (k < 0) return 0;
+      this.tp += this.B.tpAdc; const k = this.B.adc(Math.trunc(+p));
+      if (k < 0) { if (this.B.pinOf(Math.trunc(+p)) < 0 && !(Math.trunc(+p) >= 0 && Math.trunc(+p) < 8)) throw new RtErr('nopin', { pin: this.B.label(Math.trunc(+p)) }); throw new RtErr('noadc', { pin: this.B.label(Math.trunc(+p)) }); }
       const c = this.c, m = this.app.net; if (!m || !c._nodes) return 0;
-      const n = c._nodes, g = m.v(n[this.B.gnd]), vcc = m.v(n[this.B.vcc]) - g, ref = this.arefMode === 3 ? 1.1 : Math.max(vcc, 0.5);
-      const v = m.v(n[this.B.term(k)]) - g;
-      return U.clamp(Math.floor(v / ref * 1024), 0, 1023);
+      const n = c._nodes, g = m.v(n[this.B.gnd]), vcc = m.v(n[this.B.vcc]) - g, ref = this.arefMode === 3 ? 1.1 : this.B.adcRef || Math.max(vcc, 0.5);
+      const v = m.v(n[this.B.term(k)]) - g, full = 1 << this.adcRes;
+      return U.clamp(Math.floor(v / ref * full), 0, full - 1);
     }
     aref(x) { this.arefMode = Math.trunc(+x); }
     *dly(ms) { ms = +ms; if (ms > 0) this.tp += ms * 1e-3; if (this.tp >= this.lim || this.pn) yield 0; }
@@ -228,7 +314,7 @@ const MCU = (() => {
     upMs(t) { return Math.max(0, Math.floor((t - this.tBoot) * 1000 + 1e-6)); }   // wall-clock (simulated) uptime for display
     us() { return (Math.floor((this.tp - this.tBoot) * 1e6 / 4 + 1e-6) * 4) >>> 0; }
     *tone(p, f, d) {
-      this.tp += TP_IO; const k = this.pin(p);
+      this.tp += this.B.tpIo; const k = this.pin(p);
       if (k >= 0 && f > 0) {
         this.modeP[k] = 1; const tEnd = d > 0 ? this.tp + d * 1e-3 : Infinity;
         this.at((t) => {
@@ -248,7 +334,7 @@ const MCU = (() => {
     }
     toneEnd(ch) { this.dropCh(ch); if (this.toneCh === ch) this.toneCh = null; this.hOut[ch.pin] = 0; this.hMode[ch.pin] = 1; }
     *notone(p) {
-      this.tp += TP_IO; const k = this.pin(p);
+      this.tp += this.B.tpIo; const k = this.pin(p);
       this.at(() => { if (this.toneCh && (k < 0 || this.toneCh.pin === k)) this.toneEnd(this.toneCh); });
       if (k >= 0) this.outP[k] = 0;
       if (this.tp >= this.lim || this.pn) yield 0;
@@ -456,7 +542,7 @@ const MCU = (() => {
             msg += ' ' + _t(dg.join(',') === [...data].reverse().join(',') ? 'mcu.lib.lcd_rev' : 'mcu.lib.lcd_perm', { want, got });
           }
           if (at.every((p) => p >= 0)) {
-            const num = (p) => { for (let k = 0; k < 40; k++) if (R.pin(k) === p) return k; return -1; };
+            const num = (p) => { for (let k = 0; k < 256; k++) if (R.B.pinOf(k) === p) return k; return -1; };
             const na = args.map((x) => x), ie = args.length === 6 || args.length === 10 ? 1 : 2;
             na[0] = num(at[0]); na[ie] = num(at[1]); for (let i = 0; i < 4; i++) na[na.length - 4 + i] = num(at[2 + i]);
             if (na.every((x) => x >= 0)) msg += ' ' + _t('mcu.lib.lcd_fix', { code: 'LiquidCrystal lcd(' + na.join(', ') + ');' });
@@ -517,7 +603,7 @@ const MCU = (() => {
       return used <= 1 ? _t('mcu.lib.unconnected') : _t('mcu.lib.other_net');
     }
     // ---- I2C (Wire, library level): devices answer when their SDA / SCL are on the board's I2C pins and powered
-    i2cPins() { return this.c.type === 'attiny85' ? [0, 2] : [18, 19]; }
+    i2cPins() { if (!this.B.i2c) throw new RtErr('noi2c', {}); return this.B.i2c; }
     i2cDevs() {
       const n = this.c._nodes; if (!n) return [];
       const [a, b] = this.i2cPins(), sda = n[this.B.term(a)], scl = n[this.B.term(b)], m = this.app.net;
@@ -749,7 +835,7 @@ const MCU = (() => {
     drv[p] = d;
     const pr = c._pin && c._pin[p];
     if (pr) {
-      const [gh, gl] = pinG(d); pr[0].g = gh; pr[1].g = gl;
+      const [gh, gl] = pinG(d, BOARDS[c.type]); pr[0].g = gh; pr[1].g = gl;
       app.net.needStamp = true;
       if (!app._edgeAt) app._edgeAt = new Map();
       const nd = c._nodes[BOARDS[c.type].term(p)];
@@ -764,10 +850,12 @@ const MCU = (() => {
       }
     }
   }
-  function pinG(d) {
+  function pinG(d, B) {
     if (d === -1 || d === undefined) return [G_OFF, G_OFF];
-    if (d === -2) return [1 / R_PU, G_OFF];
-    return [Math.max(d / R_OUT, G_OFF), Math.max((1 - d) / R_OUT, G_OFF)];
+    if (d === -2) return [1 / B.rPu, G_OFF];
+    if (d === -3) return [G_OFF, 1 / B.rPd];
+    const rh = B.rOutH || B.rOut;
+    return [Math.max(d / rh, G_OFF), Math.max((1 - d) / B.rOut, G_OFF)];
   }
 
   // ---------------------------------------------------------------- part definitions -----------------------------
@@ -801,7 +889,7 @@ const MCU = (() => {
     const B = BOARDS[c.type], drv = c.state.drv || [];
     c._pin = [];
     for (let p = 0; p < B.n; p++) {
-      const t = n[B.term(p)], [gh, gl] = pinG(drv[p]);
+      const t = n[B.term(p)], [gh, gl] = pinG(drv[p], B);
       c._pin.push([m.addR(VCC, t, gh), m.addR(t, G, gl)]);
       m.addR(t, G, 1e-7);
     }
@@ -848,7 +936,7 @@ const MCU = (() => {
     if (rt && rt.libDiag) r.push([_t('mcu.lib.problem'), rt.libDiag]);
     r.push([_t('mcu.pins'), pinSummary(c)]);
     r.push([_t('mcu.serial_last'), lastLine(st.ser)]);
-    if (Math.abs(M.Ipin || 0) > 0.04) r.push([_t('common.note'), _t('mcu.pin_overcurrent', { pin: BOARDS[c.type].names[M.Ipinp], i: U.fmt(Math.abs(M.Ipin), 'A') })]);
+    if (Math.abs(M.Ipin || 0) > BOARDS[c.type].iMax) r.push([_t('common.note'), _t('mcu.pin_overcurrent', { pin: BOARDS[c.type].names[M.Ipinp], i: U.fmt(Math.abs(M.Ipin), 'A') })]);
     r.push([_t('common.note'), _t('mcu.note_edit')]);
     return r;
   }
@@ -858,21 +946,24 @@ const MCU = (() => {
     let rt = st.rt;
     if (rt && (rt.src !== c.props.code || rt.lang !== c.props.lang)) { rt = st.rt = null; st.ser = ''; }
     let held = false;
-    if (c.type === 'attiny85' && !c.props.rstio && c._nodes && app.net) { const n = c._nodes; held = vcc >= V_BOOT && app.net.v(n[0]) - app.net.v(n[B.gnd]) < 0.3 * vcc; }
+    if (B.held) held = c._nodes && app.net ? B.held(c, app, vcc) : false;
+    else if (c.type === 'attiny85' && !c.props.rstio && c._nodes && app.net) { const n = c._nodes; held = vcc >= B.vBoot && app.net.v(n[0]) - app.net.v(n[B.gnd]) < 0.3 * vcc; }
     if (st.held !== held) { st.held = held; if (held) { rt = st.rt = null; } }
     if (!rt) {
-      if (vcc >= V_BOOT && !held) {
+      if (vcc >= B.vBoot && !held) {
         rt = st.rt = new McuRT(c, app, app.t);
         if (rt.err && rt.err.compile) app.toast(_t('mcu.toast_compile_error', { line: rt.err.line, msg: errText(rt.err) }));
       } else for (let p = 0; p < B.n; p++) setDrive(c, p, -1, app.t, app);
-    } else if (vcc < V_OFF) {
+    } else if (vcc < B.vOff) {
       st.rt = null;
       for (let p = 0; p < B.n; p++) setDrive(c, p, -1, app.t, app);
     }
-    if (Math.abs(M.Ipin || 0) > 0.04) { if (!st.ocWarn) { st.ocWarn = true; app.toast(_t('mcu.pin_overcurrent', { pin: B.names[M.Ipinp], i: U.fmt(Math.abs(M.Ipin), 'A') })); } }
-    else if (Math.abs(M.Ipin || 0) < 0.03) st.ocWarn = false;
+    if (Math.abs(M.Ipin || 0) > B.iMax) { if (!st.ocWarn) { st.ocWarn = true; app.toast(_t('mcu.pin_overcurrent', { pin: B.names[M.Ipinp], i: U.fmt(Math.abs(M.Ipin), 'A') })); } }
+    else if (Math.abs(M.Ipin || 0) < 0.75 * B.iMax) st.ocWarn = false;
   }
   const LANG_OPTS = [['ino', 'Arduino C/C++'], ['js', 'JavaScript']];
+  // v12: a board with its own language list (8051: C51 only) shows that list in the editor too
+  const langOpts = (c) => { const lp = ((DEFS[c.type] && DEFS[c.type].props) || []).find((p) => p.k === 'lang' && p.ok); return lp ? lp.opts : LANG_OPTS; };
   const UNO_TOP = [['GND', -140, 23], ['13', -120, 13], ['12', -100, 12], ['~11', -80, 11], ['~10', -60, 10], ['~9', -40, 9], ['8', -20, 8],
     ['7', 20, 7], ['~6', 40, 6], ['~5', 60, 5], ['4', 80, 4], ['~3', 100, 3], ['2', 120, 2], ['TX\u21921', 140, 1], ['RX\u21900', 160, 0]];
   const UNO_BOT = [['3.3V', -100, 21], ['5V', -80, 20], ['GND', -60, 24], ['GND', -40, 25], ['VIN', -20, 22],
@@ -1034,7 +1125,7 @@ const MCU = (() => {
     const d = DEFS[c.type];
     return '<div class="mw-h"><span class="mw-title">✎ ' + esc(_t('mcu.editor_title')) + ' — ' + esc(d.name) + ' <small>#' + c.id + '</small></span>' +
       '<span class="mw-st"></span><button class="mw-x" title="' + esc(_t('mcu.close')) + '">✕</button></div>' +
-      '<div class="mw-tb"><label>' + esc(_t('mcu.lang')) + ' <select class="mw-lang">' + LANG_OPTS.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></label>' +
+      '<div class="mw-tb"><label>' + esc(_t('mcu.lang')) + ' <select class="mw-lang">' + langOpts(c).map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></label>' +
       '<button class="mw-check">✓ ' + esc(_t('mcu.check')) + '</button>' +
       '<button class="mw-upload primary" title="Ctrl+S / Ctrl+Enter">⬆ ' + esc(_t('mcu.upload')) + '</button>' +
       '<button class="mw-reset">⟲ ' + esc(_t('mcu.reset_chip')) + '</button>' +
@@ -1214,5 +1305,7 @@ const MCU = (() => {
   }
   function relang() { if (W.el && W.id !== null && W.el.style.display !== 'none') { const c = compById(W.id); if (!c) return; saveDraft(); const ta = W.el.querySelector('.mw-code'), top = ta.scrollTop; openEditor(c); W.el.querySelector('.mw-code').scrollTop = top; gutter(); } }
 
-  return { BOARDS, McuRT, RtErr, errText, statusOf, BLINK_UNO, BLINK_TINY, setDrive, openEditor, closeEditor, tick, relang, uploadTo, drafts, W };
+  return { BOARDS, McuRT, RtErr, errText, statusOf, BLINK_UNO, BLINK_TINY, setDrive, openEditor, closeEditor, tick, relang, uploadTo, drafts, W,
+    // v12: helpers for the extra boards in js/boards.js
+    addBoard, mkConsts, buildPins, measurePins, postMcu, readingsMcu, labelMcu, LANG_OPTS, C16 };
 })();

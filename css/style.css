@@ -169,6 +169,9 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .pin-win .pw-h { background: linear-gradient(#2a8a7a, #1f6b5f); }
 .pin-win .pw-board { font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid rgba(255,255,255,.5); background: rgba(255,255,255,.12); color: #fff; border-radius: 12px; cursor: pointer; white-space: nowrap; }
 .pin-win .pw-board.on { background: #fff; color: #1f6b5f; font-weight: 700; }
+.pin-win .pw-h { flex-wrap: wrap; row-gap: 5px; }
+.pin-win .pw-boards { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 300px; }
+.pin-win .pw-board { padding: 2px 8px; }
 .pin-win .pw-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 10px; background: #eef6f4; border-bottom: 1px solid #d3e4df; }
 .pin-win .pw-nav a, .pin-win .pw-toc a, .pin-win .pw-rel a, .pin-win .pw-sub a, .pin-win .pw-other a { color: #1f6b9f; text-decoration: none; }
 .pin-win .pw-nav a:hover, .pin-win .pw-toc a:hover, .pin-win .pw-rel a:hover, .pin-win .pw-sub a:hover, .pin-win .pw-other a:hover { text-decoration: underline; }

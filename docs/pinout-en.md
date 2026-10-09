@@ -8,6 +8,13 @@
 
 - [Arduino Uno board](#arduino)
 - [ATtiny85 microcontroller (8-pin)](#attiny85)
+- [Arduino Nano Board](#nano)
+- [Arduino Mega 2560 Board](#mega)
+- [Arduino Pro Mini Board](#promini)
+- [ESP32 DevKit V1 (30-pin)](#esp32)
+- [Raspberry Pi Pico](#pico)
+- [STM32 Blue Pill (F103C8)](#bluepill)
+- [8051 MCU (STC89C52 / AT89C52, DIP-40)](#c51)
 - [Common usage](#usage)
 - [Sensors](#sensors)
 - [Examples](#examples)
@@ -106,6 +113,348 @@ ATtiny85 (8-pin DIP, 8-bit AVR): 5 general-purpose I/O pins PB0–PB4 plus PB5 (
 - ADC: 10 bits, 4 single-ended inputs ADC0–ADC3 = PB5 / PB2 / PB4 / PB3; reference VCC, internal 1.1 V, internal 2.56 V or external AREF on PB0.
 - Memory: 8 KB Flash, 512 B SRAM, 512 B EEPROM.
 - Clock: shipped as internal 8 MHz RC ÷ 8 = 1 MHz (CKDIV8 fuse); can be changed to internal 8 MHz, 16 MHz PLL, or an external crystal (uses PB3/PB4).
+
+<a id="nano"></a>
+
+## Arduino Nano Board
+
+Arduino Nano (ATmega328P, 16 MHz, 5 V logic): the same chip as the Uno on a small breadboard-friendly board. D0–D13 (6 PWM pins marked ~), A0–A7 (10-bit ADC; A6/A7 are analog-only), Mini-USB socket, 7–12 V on VIN.
+
+### Pin map
+
+![Arduino Nano Board](pinout-nano.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **D0 / D1** | PD0 · RXD / PD1 · TXD | digital in/out, ~~serial receive RX~~, ~~serial transmit TX~~<br>D0/D1 are wired to the board's USB-serial chip: uploading and `Serial` both use them, and external circuits on them can make uploads fail. In the simulator D0/D1 work as plain I/O and `Serial` goes straight to the serial monitor. | ◐ partly |
+| **D2, D4, D7, D8, D12** | PD2 · PD4 · PD7 · PB0 · PB4 | digital in/out | ✓ yes |
+| **D3, D9, D10, D11 ~** | OC2B · OC1A · OC1B · OC2A | digital in/out, PWM ≈ 490 Hz<br>`tone()` uses Timer2, so PWM on D3 and D11 stops working while a tone plays. | ✓ yes |
+| **D5, D6 ~** | OC0B · OC0A | digital in/out, PWM ≈ 980 Hz | ✓ yes |
+| **D13** | PB5 · SCK | digital in/out, ~~SPI clock SCK~~, on-board LED “L”<br>The on-board LED “L” is connected to D13 through a resistor: it lights whenever D13 is HIGH and adds a load when D13 is used as an input. | ◐ partly |
+| **A0–A5 (D14–D19)** | PC0–PC5 · ADC0–ADC5 | analog input (10-bit ADC), digital in/out<br>A4/A5 are also the I²C pins SDA/SCL (Wire). A0–A5 can be used as digital pins D14–D19. | ✓ yes |
+| **A6, A7** | ADC6 · ADC7 | analog input (10-bit ADC)<br>A6 and A7 (ADC6/ADC7 exist only on the small TQFP/QFN package) are connected only to the ADC: `analogRead(A6)` works, but `pinMode`, `digitalRead` and `digitalWrite` do not — the simulator reports an error. | ✓ yes |
+| **5V** |  | 5 V supply<br>5 V rail: comes from USB (through a Schottky diode) or from the on-board regulator fed by VIN. You may also feed a regulated 5 V here, which bypasses the regulator. | ✓ yes |
+| **3V3** |  | 3.3 V supply output<br>3.3 V output; on the original Nano it comes from the USB-serial chip (FT232RL), so only a small current (about 50 mA) is available. | ✓ yes |
+| **VIN** |  | external supply input VIN<br>External supply input (the DC jack reaches it through a diode): 7–12 V recommended, 6–20 V limits. Below 7 V the 5 V rail may sag; above 12 V the regulator runs hot. | ✓ yes |
+| **GND ×2** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **RST ×2 · AREF** | PC6 · AREF | ~~reset (active low)~~, ~~analog reference AREF~~<br>RESET, AREF (and IOREF on the Mega) exist on the real board but are not terminals of the simulated part. | — pin not on the part |
+
+~~serial receive RX~~ = no
+
+### Electrical limits
+
+- Each I/O pin: ≤ 20 mA recommended, 40 mA absolute maximum; total through VCC/GND ≤ 200 mA.
+- VIN 7–12 V recommended (6–20 V limits). USB is protected by a 500 mA resettable fuse on the original board.
+- Pin voltage −0.5 V … VCC + 0.5 V; internal pull-ups 20–50 kΩ; ADC 10 bits, reference VCC (default) or internal 1.1 V.
+- Memory: 32 KB Flash (bootloader uses 0.5–2 KB), 2 KB SRAM, 1 KB EEPROM.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ The Nano part has no RST / AREF terminals; `Serial` goes straight to the serial monitor and the on-board LED is modelled as 1 kΩ + LED on D13.
+
+<a id="mega"></a>
+
+## Arduino Mega 2560 Board
+
+Arduino Mega 2560 (ATmega2560, 16 MHz, 5 V logic): 54 digital pins D0–D53 (15 PWM: D2–D13 and D44–D46), 16 analog inputs A0–A15 (10-bit), 4 hardware serial ports (Serial on D0/D1, Serial1 RX1 D19 / TX1 D18, Serial2 RX2 D17 / TX2 D16, Serial3 RX3 D15 / TX3 D14), I²C on D20/D21, SPI on D50–D53. 256 KB Flash, 8 KB SRAM, 4 KB EEPROM.
+
+### Pin map
+
+![Arduino Mega 2560 Board](pinout-mega.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **D0 / D1** | PE0 · RXD0 / PE1 · TXD0 | digital in/out, ~~serial receive RX~~, ~~serial transmit TX~~<br>D0/D1 are wired to the board's USB-serial chip: uploading and `Serial` both use them, and external circuits on them can make uploads fail. In the simulator D0/D1 work as plain I/O and `Serial` goes straight to the serial monitor. | ◐ partly |
+| **D2–D13 ~** | OC3B · OC3C · OC0B · OC3A · OC4A–C · OC2B · OC2A · OC1A · OC1B · OC0A | digital in/out, PWM ≈ 490 Hz<br>D4 and D13 use Timer0 and run at about 980 Hz; the other PWM pins (D2, D3, D5–D12, D44–D46) at about 490 Hz. | ✓ yes |
+| **D13** | PB7 | digital in/out, on-board LED “L” | ✓ yes |
+| **D14–D19** | TX3 · RX3 · TX2 · RX2 · TX1 · RX1 | digital in/out, ~~serial transmit TX~~, ~~serial receive RX~~<br>Extra hardware serial ports: Serial3 = TX3 D14 / RX3 D15, Serial2 = TX2 D16 / RX2 D17, Serial1 = TX1 D18 / RX1 D19. In the simulator these pins work as normal digital pins, but `Serial1`–`Serial3` give a compile error; only `Serial` (serial monitor) is simulated. | ◐ partly |
+| **D20 / D21** | SDA / SCL | digital in/out, ~~I²C data SDA~~, ~~I²C clock SCL~~ | ◐ partly |
+| **D22–D43, D47–D49** | PA · PC · PL · PG · PD7 | digital in/out | ✓ yes |
+| **D44–D46 ~** | OC5C · OC5B · OC5A | digital in/out, PWM ≈ 490 Hz | ✓ yes |
+| **D50–D53** | MISO · MOSI · SCK · SS | digital in/out, ~~SPI MISO (master in)~~, ~~SPI MOSI (master out)~~, ~~SPI clock SCK~~, ~~SPI slave select SS~~ | ◐ partly |
+| **A0–A15 (D54–D69)** | PF0–PF7 · PK0–PK7 · ADC0–ADC15 | analog input (10-bit ADC), digital in/out | ✓ yes |
+| **5V** |  | 5 V supply<br>Comes from the on-board 5 V regulator (when powered through VIN/DC) or from USB. Fine for sensors and small modules; on USB the whole board is limited by a 500 mA resettable fuse. You can also feed a regulated 5 V in here, but that bypasses the regulator and protection. | ✓ yes |
+| **3.3V** |  | 3.3 V supply output<br>On-board 3.3 V regulator output, 50 mA max. | ✓ yes |
+| **VIN** |  | external supply input VIN<br>External supply input (the DC jack reaches it through a diode): 7–12 V recommended, 6–20 V limits. Below 7 V the 5 V rail may sag; above 12 V the regulator runs hot. | ✓ yes |
+| **GND ×5** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **RESET · AREF · IOREF** |  | ~~reset (active low)~~, ~~analog reference AREF~~, ~~I/O voltage reference IOREF~~<br>RESET, AREF (and IOREF on the Mega) exist on the real board but are not terminals of the simulated part. | — pin not on the part |
+
+~~serial receive RX~~ = no
+
+### Electrical limits
+
+- Each I/O pin: ≤ 20 mA recommended, 40 mA absolute maximum; total through VCC/GND ≤ 200 mA.
+- VIN 7–12 V recommended (6–20 V limits); the 3.3V pin supplies at most 50 mA.
+- ADC: 10 bits, 16 channels A0–A15; reference VCC (default), internal 1.1 V or 2.56 V, or external AREF.
+- Memory: 256 KB Flash (8 KB bootloader), 8 KB SRAM, 4 KB EEPROM. External interrupts on D2, D3, D18, D19, D20, D21.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ `Serial1`–`Serial3` are not simulated (compile error); only `Serial` works. No RESET / AREF / IOREF / ICSP terminals.
+
+<a id="promini"></a>
+
+## Arduino Pro Mini Board
+
+Arduino Pro Mini (ATmega328P): a minimal board without USB, in a 5 V / 16 MHz and a 3.3 V / 8 MHz version (choose it in the properties). D0–D13, A0–A7 (A4–A7 are pads inside the board), on-board regulator from RAW, programmed through a 6-pin USB-serial adapter header.
+
+### Pin map
+
+![Arduino Pro Mini Board](pinout-promini.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **D0 (RXI) / D1 (TXO)** | PD0 · RXD / PD1 · TXD | digital in/out, ~~serial receive RX~~, ~~serial transmit TX~~<br>D0 (RXI) / D1 (TXO) also go to the 6-pin header for the USB-serial adapter (adapter TX → RXI, adapter RX ← TXO). | ◐ partly |
+| **D2, D4, D7, D8, D12** | PD2 · PD4 · PD7 · PB0 · PB4 | digital in/out | ✓ yes |
+| **D3, D5, D6, D9, D10, D11 ~** | OC2B · OC0B · OC0A · OC1A · OC1B · OC2A | digital in/out, PWM ≈ 490 Hz, PWM ≈ 980 Hz | ✓ yes |
+| **D13** | PB5 · SCK | digital in/out, ~~SPI clock SCK~~, on-board LED “L”<br>The on-board LED “L” is connected to D13 through a resistor: it lights whenever D13 is HIGH and adds a load when D13 is used as an input. | ◐ partly |
+| **A0–A3** | PC0–PC3 · ADC0–ADC3 | analog input (10-bit ADC), digital in/out | ✓ yes |
+| **A4 / A5** | PC4 · SDA / PC5 · SCL | analog input (10-bit ADC), digital in/out, ~~I²C data SDA~~, ~~I²C clock SCL~~<br>A4/A5 (I²C SDA/SCL) and A6/A7 are pads inside the board, not on the long edge rows; their position varies between clones. | ◐ partly |
+| **A6, A7** | ADC6 · ADC7 | analog input (10-bit ADC)<br>A6 and A7 (ADC6/ADC7 exist only on the small TQFP/QFN package) are connected only to the ADC: `analogRead(A6)` works, but `pinMode`, `digitalRead` and `digitalWrite` do not — the simulator reports an error. | ✓ yes |
+| **VCC** |  | supply VCC<br>VCC is the regulated rail: 5 V on the 5 V / 16 MHz version, 3.3 V on the 3.3 V / 8 MHz version. Feed it from the USB-serial adapter or a regulated supply, or use it as an output when the board is powered through RAW. | ✓ yes |
+| **RAW** |  | unregulated input RAW<br>RAW feeds the on-board low-dropout regulator (MIC5205 type, about 150 mA): up to 12 V. On the 3.3 V version a single Li-ion cell (3.4–4.2 V) works. | ✓ yes |
+| **GND ×2** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **RST ×2 · FTDI header** | DTR · TXO · RXI · VCC · GND | ~~reset (active low)~~<br>The 6-pin header for the USB-serial adapter (DTR, TXO, RXI, VCC, GND) and the RST pins are not separate terminals; choose the power option “USB-serial adapter” to supply VCC. | — pin not on the part |
+
+~~serial receive RX~~ = no
+
+### Electrical limits
+
+- Each I/O pin: ≤ 20 mA recommended, 40 mA absolute maximum; total through VCC/GND ≤ 200 mA.
+- RAW: 5 V version up to 12 V; 3.3 V version 3.35–12 V. The on-board regulator supplies about 150 mA.
+- The ATmega328P is only rated up to about 10 MHz at 3.3 V, which is why the 3.3 V version runs at 8 MHz.
+- Memory: 32 KB Flash (bootloader uses 0.5–2 KB), 2 KB SRAM, 1 KB EEPROM.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ The 3.3 V / 8 MHz version is modelled by halving instruction speed and PWM frequency (`delay()` / `millis()` keep real time). The adapter header and DTR auto-reset are not modelled; the power option “USB-serial adapter” is an ideal VCC supply.
+
+<a id="esp32"></a>
+
+## ESP32 DevKit V1 (30-pin)
+
+ESP32 DevKit V1, 30-pin version (ESP32-WROOM-32, dual-core 240 MHz, 3.3 V logic). Pins are numbered by GPIO (digitalWrite(2, HIGH) = GPIO2). 12-bit ADC on 15 pins (ADC1 and ADC2), 2 DACs (GPIO25/26), 10 touch pads T0–T9, LEDC PWM on any output pin, GPIO34–39 input-only. The board has a CP2102/CH340 USB-serial chip, an AMS1117 3.3 V regulator, EN and BOOT buttons and a blue LED on GPIO2.
+
+### Pin map
+
+![ESP32 DevKit V1 (30-pin)](pinout-esp32.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **GPIO36 (VP), GPIO39 (VN), GPIO34, GPIO35** | ADC1_CH0 · CH3 · CH6 · CH7 | input only, 12-bit analog input<br>GPIO34–GPIO39 are input-only: no output driver and no internal pull-up/pull-down. `pinMode(34, OUTPUT)` and `INPUT_PULLUP` give an error — use external resistors. VP = GPIO36, VN = GPIO39. | ✓ yes |
+| **GPIO32, GPIO33** | ADC1_CH4 / CH5 · T9 / T8 | digital in/out, PWM output (analogWrite), 12-bit analog input, capacitive touch pad (touchRead) | ✓ yes |
+| **GPIO25, GPIO26** | DAC1 / DAC2 · ADC2_CH8 / CH9 | digital in/out, PWM output (analogWrite), 8-bit DAC output (dacWrite), ADC2 (not usable while WiFi is on)<br>GPIO25 / GPIO26 carry the two 8-bit DACs: `dacWrite(25, 0…255)` gives roughly 0…3.3 V. They also work as normal I/O and PWM. | ✓ yes |
+| **GPIO4, 12, 13, 14, 15, 27** | ADC2 · T0 · T5 · T4 · T6 · T3 · T7 | digital in/out, PWM output (analogWrite), ADC2 (not usable while WiFi is on), capacitive touch pad (touchRead)<br>These pins belong to ADC2, which the WiFi driver uses: `analogRead` on them fails while WiFi is on. Prefer ADC1 pins (GPIO32–GPIO39) for analog inputs. (WiFi is never on in the simulator, so ADC2 reads work here.) | ✓ yes |
+| **GPIO2** | ADC2_CH2 · T2 | digital in/out, PWM output (analogWrite), ADC2 (not usable while WiFi is on), capacitive touch pad (touchRead), on-board LED (lit when HIGH), ~~boot strapping pin~~ | ◐ partly |
+| **GPIO0 (BOOT)** | ADC2_CH1 · T1 | digital in/out, ~~boot strapping pin~~<br>GPIO0 is connected to the BOOT button and a pull-up; holding it LOW during reset starts the download (flashing) mode. The 30-pin board does not bring it to a header pin, so in the simulator it exists only inside the board (it reads HIGH). | ◐ partly |
+| **GPIO5, 12, 15** | GPIO5 · MTDI · MTDO | ~~boot strapping pin~~<br>Strapping pins are sampled at reset: GPIO0 and GPIO2 select boot / download mode, GPIO12 (MTDI) selects the flash voltage (HIGH at boot = 1.8 V, and a 3.3 V-flash module then fails to boot), GPIO15 (MTDO) controls the boot log, GPIO5 the SDIO timing. Avoid strong pull-ups/pull-downs on them. The simulator does not check strapping. | ✗ no |
+| **GPIO1 (TX0) / GPIO3 (RX0)** | UART0 | digital in/out, ~~serial transmit TX~~, ~~serial receive RX~~<br>GPIO1 (TX0) / GPIO3 (RX0) go to the USB-serial chip and are used for uploading and `Serial`; avoid connecting other circuits to them. | ◐ partly |
+| **GPIO16 (RX2) / GPIO17 (TX2), GPIO5, 18, 19, 23** | UART2 · VSPI SS / SCK / MISO / MOSI | digital in/out, PWM output (analogWrite) | ✓ yes |
+| **GPIO21 / GPIO22** | SDA / SCL | digital in/out, PWM output (analogWrite), ~~I²C data SDA~~, ~~I²C clock SCL~~ | ◐ partly |
+| **EN** | CHIP_PU | RESET (active low)<br>EN (CHIP_PU) enables the chip; the board has a 10 kΩ pull-up and the EN button. Pulling EN LOW holds the ESP32 in reset. | ✓ yes |
+| **VIN** |  | external supply input VIN<br>VIN (also labelled 5V) is the input of the AMS1117 3.3 V regulator and is connected to USB 5 V. 5 V is the usual supply; higher voltages make the linear regulator hot. With WiFi on the ESP32 draws current peaks of several hundred mA. | ✓ yes |
+| **3V3** |  | 3.3 V supply output | ✓ yes |
+| **GND ×2** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **GPIO6–GPIO11** | SPI FLASH | ~~digital in/out~~<br>GPIO6–GPIO11 are connected to the module’s internal SPI flash and must not be used; the 30-pin board does not bring them out, and the simulator reports an error if a program uses them. | — pin not on the part |
+
+~~boot strapping pin~~ = no
+
+### Electrical limits
+
+- Supply 3.0–3.6 V (3.3 V nominal); the brownout detector resets the chip at about 2.43 V. WiFi transmission causes current peaks of several hundred mA.
+- GPIO levels: HIGH ≥ 0.75 × VDD, LOW ≤ 0.25 × VDD. Default drive about 20 mA, 40 mA maximum per pin. Not 5 V tolerant.
+- Internal pull-up and pull-down about 45 kΩ (`INPUT_PULLUP`, `INPUT_PULLDOWN`), except on GPIO34–GPIO39.
+- ADC: 12 bits (0–4095). At the default 11 dB attenuation the usable range is about 0.15–3.1 V and the response is not linear near both ends.
+- DAC: 8 bits on GPIO25/26. LEDC PWM: 16 channels; frequency and resolution trade off (e.g. 5 kHz at 13 bits); `analogWrite` uses 8 bits.
+- Memory: 520 KB SRAM in the chip, 4 MB SPI flash in the WROOM-32 module.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ WiFi, Bluetooth, ESP-NOW and web servers are not simulated: `#include <WiFi.h>` (and similar) stops with an error on that line. Because WiFi is never on, ADC2 pins work.
+- ✗ The ADC is modelled as linear (0–3.3 V → 0–4095) and `analogReadMilliVolts` uses the same model; the real ADC is non-linear and saturates near 3.1 V. `touchRead` returns about 12 for the pad selected as touched in the board properties and about 75 for the others.
+- ✗ Deep sleep, RTC, FreeRTOS tasks / the second core, I²S, CAN and the Hall sensor are not simulated. GPIO0 (BOOT) exists only inside the board model, and strapping pins are not checked at reset.
+
+<a id="pico"></a>
+
+## Raspberry Pi Pico
+
+Raspberry Pi Pico (RP2040, dual Cortex-M0+ 133 MHz, 264 KB SRAM, 2 MB Flash, 3.3 V logic), programmed with the Arduino-Pico core. 40-pin DIP-style board: GP0–GP22 and GP26–GP28 on the edge, 8 GND pins, VBUS / VSYS / 3V3 / RUN. 12-bit ADC on GP26–GP28 (A0–A2), PWM on every GPIO, on-board LED on GP25; GP24 and GP29 are used on the board.
+
+### Pin map
+
+![Raspberry Pi Pico](pinout-pico.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **GP0–GP22** | GPIO0–GPIO22 | digital in/out, PWM output (analogWrite)<br>Every GP pin is digital I/O and can do PWM (8 PWM slices × 2 channels; pins on the same slice share the frequency). Drive strength 2/4/8/12 mA (default 4 mA). Not 5 V tolerant. | ✓ yes |
+| **GP0 / GP1** | UART0 TX / RX | ~~serial transmit TX~~, ~~serial receive RX~~ | ✗ no |
+| **GP4 / GP5** | I2C0 SDA / SCL | ~~I²C data SDA~~, ~~I²C clock SCL~~ | ✗ no |
+| **GP26–GP28 (A0–A2)** | ADC0–ADC2 | digital in/out, PWM output (analogWrite), 12-bit analog input<br>GP26–GP28 are ADC0–ADC2 (A0–A2). Arduino-Pico returns 10 bits by default; call `analogReadResolution(12)` for 0–4095. The reference is ADC_VREF (the filtered 3.3 V). | ✓ yes |
+| **GP25** | LED | on-board LED (lit when HIGH) | ✓ yes |
+| **GP29 (A3)** | ADC3 · VSYS ÷ 3 | 12-bit analog input<br>GP29 (ADC3, A3) measures VSYS through an on-board 200 kΩ / 100 kΩ divider: VSYS = reading × 3 × 3.3 V / 4095 (12 bit). Not on the header. | ✓ yes |
+| **GP24** | VBUS SENSE | digital in/out<br>Used on the board, not on the header: GP23 controls the power-save mode of the on-board converter, GP24 senses VBUS (HIGH when USB is connected), GP25 drives the LED. In the simulator GP24 and GP25 exist; GP23 gives a “does not exist” error. | ✓ yes |
+| **VBUS** |  | USB 5 V (VBUS)<br>VBUS is the micro-USB 5 V. It feeds VSYS through a Schottky diode and can supply 5 V parts while USB is connected. | ✓ yes |
+| **VSYS** |  | system supply input VSYS<br>VSYS is the main system input, 1.8–5.5 V, for the on-board buck-boost converter (RT6150) that makes 3.3 V. Connect a battery here (add your own diode if USB may be connected at the same time). | ✓ yes |
+| **3V3 (OUT)** |  | 3.3 V supply output<br>3.3 V output of the on-board converter; keep external loads below about 300 mA. | ✓ yes |
+| **RUN** |  | RESET (active low)<br>RUN is the RP2040 enable input with a pull-up: connecting it to GND resets the Pico (a reset button goes between RUN and GND). | ✓ yes |
+| **GND ×7 · AGND** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **3V3_EN · ADC_VREF** |  | ~~3.3 V regulator enable~~, ~~analog reference AREF~~<br>3V3_EN (pulled up; LOW switches the 3.3 V converter off) and ADC_VREF (ADC reference, filtered 3.3 V) are not terminals of the simulated part. | — pin not on the part |
+| **GP23** | SMPS PS | ~~digital in/out~~<br>Used on the board, not on the header: GP23 controls the power-save mode of the on-board converter, GP24 senses VBUS (HIGH when USB is connected), GP25 drives the LED. In the simulator GP24 and GP25 exist; GP23 gives a “does not exist” error. | — pin not on the part |
+
+~~serial transmit TX~~ = no
+
+### Electrical limits
+
+- Supply: VSYS 1.8–5.5 V or VBUS 5 V; the 3V3 output should not be loaded with more than about 300 mA.
+- GPIO at 3.3 V: HIGH ≥ 2.0 V, LOW ≤ 0.8 V; drive 2/4/8/12 mA (default 4 mA); total GPIO current at most 50 mA. Not 5 V tolerant.
+- Internal pull-up / pull-down 50–80 kΩ.
+- ADC: 12 bits, 500 kS/s, 4 external inputs (GP26–GP29) plus the internal temperature sensor; effective resolution about 9 bits.
+- PWM: 8 slices × 2 channels (16 outputs). Arduino-Pico defaults to 1 kHz and a range of 255; change with `analogWriteFreq`, `analogWriteRange` or `analogWriteResolution`.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ The second core (`setup1` / `loop1`), PIO, USB device functions and the temperature sensor (ADC4) are not simulated. GP23, 3V3_EN and ADC_VREF are not terminals; the ADC reference is the 3V3 rail.
+- ✗ The RT6150 buck-boost converter is modelled as an ideal 3.3 V regulator (85 % efficiency, 0.8 A limit) that stops below 1.8 V on VSYS; switching ripple is not simulated.
+
+<a id="bluepill"></a>
+
+## STM32 Blue Pill (F103C8)
+
+STM32 “Blue Pill” (STM32F103C8T6, Cortex-M3 72 MHz, 64 KB Flash, 20 KB SRAM, 3.3 V logic), programmed with the STM32duino core: pins are named by port and bit (PA0, PB12, PC13 …). 12-bit ADC on 10 pins, timer PWM on 15 pins, on-board LED on PC13 (active LOW), 3.3 V regulator fed from the 5V pin or micro-USB.
+
+### Pin map
+
+![STM32 Blue Pill (F103C8)](pinout-bluepill.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **PA0–PA3, PA6, PA7** | ADC12_IN0–IN3 · IN6 · IN7 · TIM2 / TIM3 | digital in/out, 12-bit analog input, PWM output (analogWrite)<br>PA0–PA7, PB0, PB1 are ADC channels IN0–IN9 (12 bit, 0–3.3 V). STM32duino’s `analogRead` returns 10 bits unless you call `analogReadResolution(12)`. Analog pins are not 5 V tolerant. | ✓ yes |
+| **PA4, PA5** | ADC12_IN4 · IN5 | digital in/out, 12-bit analog input | ✓ yes |
+| **PB0, PB1** | ADC12_IN8 · IN9 · TIM3_CH3 / CH4 | digital in/out, 12-bit analog input, PWM output (analogWrite) | ✓ yes |
+| **PA8–PA11** | TIM1_CH1–CH4 | digital in/out, PWM output (analogWrite), ~~5 V tolerant (FT)~~ | ◐ partly |
+| **PA9 / PA10** | USART1 TX / RX | ~~serial transmit TX~~, ~~serial receive RX~~ | ✗ no |
+| **PA11 / PA12** | USB D− / D+ | digital in/out, ~~5 V tolerant (FT)~~<br>PA11 / PA12 are the USB D− / D+ lines of the micro-USB socket. Many Blue Pills fit a 10 kΩ instead of 1.5 kΩ pull-up on D+, which some PCs reject. Avoid using them as I/O together with USB. | ◐ partly |
+| **PA15, PB3, PB4, PB5** | JTDI · JTDO · NJTRST | digital in/out, ~~5 V tolerant (FT)~~ | ◐ partly |
+| **PB6 / PB7** | I2C1 SCL / SDA · TIM4_CH1 / CH2 | digital in/out, PWM output (analogWrite), ~~I²C clock SCL~~, ~~I²C data SDA~~, ~~5 V tolerant (FT)~~ | ◐ partly |
+| **PB8, PB9** | TIM4_CH3 / CH4 | digital in/out, PWM output (analogWrite), ~~5 V tolerant (FT)~~ | ◐ partly |
+| **PB10–PB15** | I2C2 · USART3 · SPI2 | digital in/out, ~~5 V tolerant (FT)~~ | ◐ partly |
+| **PC13** |  | digital in/out, on-board LED (lit when LOW)<br>PC13–PC15 are supplied through the backup-domain switch: they can sink only about 3 mA, switch at no more than 2 MHz and must not source current (e.g. drive an LED to GND). The on-board LED is wired from 3.3 V to PC13, so it lights when PC13 is LOW. PC14/PC15 are also the 32.768 kHz crystal pins. | ✓ yes |
+| **PC14, PC15** | OSC32_IN / OUT | digital in/out, ~~external crystal pin~~ | ◐ partly |
+| **5V** |  | 5 V supply<br>5V pin: connected to the micro-USB 5 V and to the input of the on-board 3.3 V regulator. Feed only about 5 V here (the small regulator is not meant for higher voltages) and never 5 V into a 3.3 pin. | ✓ yes |
+| **3.3 ×2** |  | 3.3 V supply output | ✓ yes |
+| **G ×3** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+| **R** | NRST | RESET (active low) | ✓ yes |
+| **VB** | VBAT | ~~backup battery VBAT~~<br>VB (VBAT) powers the RTC and backup registers when the main supply is off; tie it to 3.3 V if unused. Not a terminal of the simulated part. | — pin not on the part |
+| **PA13 / PA14** | SWDIO / SWCLK | ~~SWD debug port~~<br>PA13 / PA14 (SWDIO / SWCLK) are on the 4-pin debug header at the end of the board, used by an ST-Link to program and debug; not terminals of the simulated part. | — pin not on the part |
+
+~~5 V tolerant (FT)~~ = no
+
+### Electrical limits
+
+- Supply VDD 2.0–3.6 V (3.3 V from the on-board regulator).
+- Pin current ±8 mA with standard levels (±20 mA with relaxed levels), 25 mA absolute maximum per pin, 150 mA total.
+- FT pins accept 5 V as inputs (or open-drain outputs); analog-capable pins (PA0–PA7, PB0, PB1) do not.
+- Pull-up / pull-down 30–50 kΩ. ADC: 12 bits, 0–3.3 V, about 1 µs per conversion.
+- PC13–PC15: sink at most 3 mA, at most 2 MHz, only one of them switching at a time, and never as a current source.
+
+### Simulator support
+
+- ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ EEPROM, sleep modes, the watchdog, fuse settings and direct register access (such as `PORTB`, `DDRB`) are not supported.
+- ✗ Instruction timing is not modelled: code runs instantly and only `delay()`, `millis()` and friends advance time; an endless loop that exceeds the work limit stops with an error.
+- ✗ USB on PA11/PA12, the BOOT0/BOOT1 jumpers, SWD, VBAT/RTC and the crystals are not simulated, and 5 V tolerance is not checked. `Serial` goes straight to the serial monitor.
+
+<a id="c51"></a>
+
+## 8051 MCU (STC89C52 / AT89C52, DIP-40)
+
+Classic 8051 microcontroller (STC89C52RC / AT89C52, DIP-40, 5 V, 8 KB Flash, 256 B RAM). 32 I/O lines in four 8-bit ports P0–P3, written whole (P1 = 0xFE;) or bit by bit (sbit LED = P1^0;). One machine cycle = 12 crystal clocks; 11.0592 MHz is the usual crystal because it gives exact UART baud rates. Needs a reset circuit on RST, a crystal on XTAL1/XTAL2 and EA tied to VCC.
+
+### Pin map
+
+![8051 MCU (STC89C52 / AT89C52, DIP-40)](pinout-c51.svg)
+
+`Digital I/O` · `PWM output` · `Analog input` · `Communication (UART/SPI/I²C)` · `External interrupt` · `Power` · `Ground` · `Special function` — Dashed = not simulated
+
+### Pin table
+
+| Pin | Port / datasheet names | Functions & notes | Simulated |
+|---|---|---|---|
+| **P0.0–P0.7 (39–32)** | AD0–AD7 | open-drain port P0<br>P0 has no internal pull-ups (open drain): writing 1 leaves the pin floating. As output or input it needs external pull-ups (typically a 10 kΩ resistor network to VCC). P0 is also the multiplexed address/data bus AD0–AD7 for external memory. | ✓ yes |
+| **P1.0–P1.7 (1–8)** | T2 · T2EX (P1.0 / P1.1) | quasi-bidirectional I/O<br>P1–P3 are quasi-bidirectional: writing 0 pulls strongly to GND (sinks several mA), writing 1 gives only a weak pull-up (tens of µA). So drive LEDs active-LOW (VCC → resistor → LED → pin), and write 1 to a pin before reading it as an input. | ✓ yes |
+| **P2.0–P2.7 (21–28)** | A8–A15 | quasi-bidirectional I/O | ✓ yes |
+| **P3.0 / P3.1 (10, 11)** | RXD / TXD | quasi-bidirectional I/O, ~~serial receive RX~~, ~~serial transmit TX~~ | ◐ partly |
+| **P3.2 / P3.3 (12, 13)** | INT0 / INT1 | quasi-bidirectional I/O, ~~external interrupt INT0~~, ~~external interrupt INT1~~ | ◐ partly |
+| **P3.4 / P3.5 (14, 15)** | T0 / T1 | quasi-bidirectional I/O, ~~timer/counter inputs T0/T1~~ | ◐ partly |
+| **P3.6 / P3.7 (16, 17)** | WR / RD | quasi-bidirectional I/O, ~~external memory bus~~ | ◐ partly |
+| **RST (9)** |  | reset (active HIGH)<br>RST is active HIGH: holding it HIGH for at least 2 machine cycles resets the chip. Usual circuit: 10 µF from VCC to RST and 10 kΩ from RST to GND (power-on reset), plus a push button from RST to VCC. | ✓ yes |
+| **XTAL1 / XTAL2 (19, 18)** |  | ~~external crystal pin~~<br>XTAL1 / XTAL2: crystal (e.g. 11.0592 MHz or 12 MHz) with two 30 pF capacitors to GND. In the simulator the frequency is set by the board’s “crystal” property; nothing needs to be connected to these pins. | ✗ no |
+| **EA (31)** | EA / VPP | external access EA<br>EA HIGH: run from the internal Flash. EA LOW: fetch code only from external memory, so the internal program does not run. Always tie EA to VCC. | ✓ yes |
+| **PSEN / ALE (29, 30)** |  | ~~external memory bus~~ | ✗ no |
+| **VCC (40)** |  | supply VCC<br>VCC 5 V (AT89C52: 4.0–6.0 V; use the 5 V version of the STC89C52RC). The simulated chip starts above about 3.8 V and stops below about 3.5 V. | ✓ yes |
+| **GND (20)** |  | ground GND<br>All GND pins are connected together on the board; any of them can be used. | ✓ yes |
+
+~~serial receive RX~~ = no
+
+### Electrical limits
+
+- Supply 5 V (AT89C52: 4.0–6.0 V). Clock 0–24 MHz on the AT89C52; one machine cycle = 12 clock periods.
+- Sink current (AT89C52): at most 10 mA per pin, 26 mA for port P0, 15 mA for each of P1–P3, 71 mA for all outputs together.
+- The quasi-bidirectional pull-up delivers only about 50 µA (briefly more during a 0→1 transition): it cannot light an LED to GND — use active-LOW wiring or a transistor.
+- Input levels at 5 V: LOW ≤ about 0.9 V, HIGH ≥ about 1.9 V (port pins), RST/XTAL1 need ≥ 0.7 × VCC.
+- Memory and peripherals: 8 KB Flash, 256 B RAM, three 16-bit timers (T0–T2), one UART, 8 interrupt sources.
+
+### Simulator support
+
+- ✗ Over-current does not “burn” the chip: the simulator only warns, so check your design against the electrical limits.
+- ✗ Only the port registers P0–P3 and their bits (`sbit`) are simulated. Timers, interrupts, the UART and other SFRs (`TMOD`, `TCON`, `IE`, `SCON`, `SBUF` …) give a compile error, as do Arduino functions.
+- ✗ Timing is estimated: one pass of a counting loop ≈ 8 machine cycles, one port access = 1 machine cycle. Typical `delay_ms` loops are within about 1 % of a real chip, but this is not a cycle-exact Keil build. If the program does not define `delay_ms`, an exact built-in one is used.
+- ✗ The crystal frequency is the board’s “crystal” property; nothing needs to be connected to XTAL1/XTAL2. An open EA pin counts as HIGH (on a real chip, tie it to VCC); RST has an internal pull-down.
 
 ## Simulator support
 
@@ -1435,6 +1784,492 @@ void loop() {
   level += step;
   if (level <= 0 || level >= 255) step = -step;
   delay(20);
+}
+```
+
+### Arduino Nano Board
+
+<a id="ex-nanoblink"></a>
+
+#### MCU: Arduino Nano Blink LED
+
+The standard Blink sketch on the Arduino Nano: the on-board LED turns on and off every 0.5 s.
+
+**Wiring**
+
+- D13 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-nanoana"></a>
+
+#### MCU: Nano potentiometer dims an LED (A7 → D9)
+
+A potentiometer on the analog-only pin A7 is read with analogRead (0–1023) and sets the PWM brightness of an LED on D9; the value is printed to the serial monitor.
+
+**Wiring**
+
+- Potentiometer: ends → 5V / GND, wiper → A7
+- D9 → 220 Ω Resistor → c.led.name → GND
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · PWM: dimming & speed control · Serial debugging
+
+```cpp
+// Arduino Nano: a potentiometer on A7 (an analog-only pin) sets the brightness of an LED on D9 (PWM).
+const int LED_PIN = 9;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(LED_PIN, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(A7);          // 0 ... 1023 (A6 / A7 cannot be digital pins)
+  analogWrite(LED_PIN, raw / 4);     // 0 ... 255
+  Serial.print("A7 = ");
+  Serial.println(raw);
+  delay(100);
+}
+```
+
+### Arduino Mega 2560 Board
+
+<a id="ex-megablink"></a>
+
+#### MCU: Arduino Mega 2560 Blink LED
+
+The standard Blink sketch on the Arduino Mega 2560: the on-board LED turns on and off every 0.5 s.
+
+**Wiring**
+
+- D13 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-megabar"></a>
+
+#### MCU: Mega 2560 potentiometer → 8-segment LED bar
+
+A potentiometer on A15 sets how many of the 8 LED bar segments (D23, D25 … D37 on the double header) are lit.
+
+**Wiring**
+
+- Potentiometer: ends → 5V / GND, wiper → A15
+- D23, D25, D27 … D37 → 220 Ω Resistor → LED Bar Graph (10-segment) anode (+, long leg)
+- LED Bar Graph (10-segment) all LED cathodes → GND
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · Digital output & LED resistors · Serial debugging
+
+```cpp
+// Arduino Mega 2560: a potentiometer on A15 drives an 8-segment LED bar graph
+// on D37, D35 ... D23 (odd pins of the double header, each through 220 ohm): the bar grows from the green end.
+const int LEDS[8] = {37, 35, 33, 31, 29, 27, 25, 23};
+
+void setup() {
+  Serial.begin(9600);
+  for (int i = 0; i < 8; i++) pinMode(LEDS[i], OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(A15);                 // 16 analog inputs A0 ... A15
+  int n = map(raw, 0, 1023, 0, 8);           // number of lit segments
+  for (int i = 0; i < 8; i++) digitalWrite(LEDS[i], i < n ? HIGH : LOW);
+  Serial.print("A15 = ");
+  Serial.print(raw);
+  Serial.print("  segments = ");
+  Serial.println(n);
+  delay(100);
+}
+```
+
+### Arduino Pro Mini Board
+
+<a id="ex-pmblink"></a>
+
+#### MCU: Arduino Pro Mini Blink LED
+
+Pro Mini Blink powered by a 9 V battery on RAW: the on-board regulator makes VCC = 5 V and the LED on D13 blinks every 0.5 s.
+
+**Wiring**
+
+- Battery 9 V: + → RAW, − → GND
+- D13 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the on-board LED "L" (pin 13) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-pmbatt"></a>
+
+#### MCU: Pro Mini 3.3 V Li-ion battery monitor
+
+The 3.3 V / 8 MHz Pro Mini runs from an 18650 cell on RAW; A0 measures the cell through a 100k/100k divider and the D13 LED blinks fast below 3.5 V.
+
+**Wiring**
+
+- 18650 Li-ion Cell 3.7 V: + → RAW, − → GND
+- RAW → 100 kΩ Resistor → A0 → 100 kΩ Resistor → GND
+- D13 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · Powering the board · Serial debugging
+
+```cpp
+// Pro Mini 3.3 V / 8 MHz on a 3.7 V Li-ion cell (RAW -> on-board 3.3 V regulator).
+// A0 measures the cell through a 100k / 100k divider; the LED on D13 blinks fast when the cell is low.
+void setup() {
+  Serial.begin(9600);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  float vbat = analogRead(A0) * 3.3 / 1023.0 * 2;   // reference = VCC = 3.3 V, divider halves the cell voltage
+  Serial.print("battery: ");
+  Serial.print(vbat, 2);
+  Serial.println(" V");
+  int ms = vbat < 3.5 ? 200 : 1000;
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(ms / 2);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(ms / 2);
+}
+```
+
+### ESP32 DevKit V1 (30-pin)
+
+<a id="ex-espblink"></a>
+
+#### MCU: ESP32 Blink LED
+
+The standard Blink sketch on the ESP32: the on-board LED turns on and off every 0.5 s.
+
+**Wiring**
+
+- GPIO2 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the blue LED on GPIO2 of the DevKit turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-espdac"></a>
+
+#### MCU: ESP32 DAC triangle wave + ADC read-back + touch
+
+dacWrite on GPIO25 makes a slow triangle wave that GPIO34 (12-bit ADC1) reads back; GPIO18 fades an LED with PWM, and touch pad T0 (GPIO4, set “touched” in the board properties) switches the blue LED on GPIO2.
+
+**Wiring**
+
+- GPIO25 (DAC1) → GPIO34 (ADC1)
+- GPIO18 → 220 Ω Resistor → c.led.name → GND
+- T0 = GPIO4
+- GPIO2 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · PWM: dimming & speed control · Serial debugging
+
+```cpp
+// ESP32: the DAC on GPIO25 makes a slow triangle wave, GPIO34 (ADC1, 12 bit) reads it back,
+// GPIO18 fades an LED with PWM, and touch pad T0 (GPIO4) switches the blue LED on GPIO2.
+// To "touch" T0: select the board and choose T0 as the touched pin in its properties.
+const int DAC_PIN = 25;
+const int ADC_PIN = 34;
+const int LED_PIN = 18;
+int level = 0;
+int step = 5;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+  analogReadResolution(12);
+}
+
+void loop() {
+  dacWrite(DAC_PIN, level);              // 0 ... 255 -> 0 ... 3.3 V
+  analogWrite(LED_PIN, level);           // same value as PWM duty
+  delay(1);                              // let the DAC output settle before sampling it
+  int raw = analogRead(ADC_PIN);         // 0 ... 4095
+  int mv = analogReadMilliVolts(ADC_PIN);
+  bool touched = touchRead(T0) < 40;     // the value drops when a finger is on the pad
+  digitalWrite(LED_BUILTIN, touched ? HIGH : LOW);
+  Serial.print("DAC=");
+  Serial.print(level);
+  Serial.print(" ADC=");
+  Serial.print(raw);
+  Serial.print(" mV=");
+  Serial.print(mv);
+  Serial.print(" touch=");
+  Serial.println(touched ? "yes" : "no");
+  level += step;
+  if (level >= 255 || level <= 0) step = -step;
+  delay(50);
+}
+```
+
+### Raspberry Pi Pico
+
+<a id="ex-picoblink"></a>
+
+#### MCU: Raspberry Pi Pico Blink LED
+
+The standard Blink sketch on the Raspberry Pi Pico: the on-board LED turns on and off every 0.5 s.
+
+**Wiring**
+
+- GP25 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the on-board LED (GP25) turns on and off every half second.
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-picoadc"></a>
+
+#### MCU: Pico potentiometer (12-bit ADC) → PWM dimming
+
+A potentiometer on GP26 (ADC0) is read with analogReadResolution(12) and drives an LED on GP15 with analogWriteRange(4095); A3 (GP29) reports VSYS / 3 and the on-board LED (GP25) lights above half scale.
+
+**Wiring**
+
+- Potentiometer: ends → 3V3 / AGND, wiper → GP26 (ADC0)
+- GP15 → 220 Ω Resistor → c.led.name → GND
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · PWM: dimming & speed control · Serial debugging
+
+```cpp
+// Raspberry Pi Pico: a potentiometer on GP26 (ADC0) sets the brightness of an LED on GP15 (PWM).
+// The ADC is read with 12 bits; A3 (GP29) measures VSYS / 3 on the board.
+const int POT_PIN = A0;      // GP26
+const int LED_PIN = 15;      // GP15
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);  // 0 ... 4095
+  analogWriteRange(4095);    // PWM duty 0 ... 4095 as well
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(POT_PIN);
+  analogWrite(LED_PIN, raw);
+  float vsys = analogRead(A3) * 3.3 * 3 / 4095.0;
+  digitalWrite(LED_BUILTIN, raw > 2048 ? HIGH : LOW);
+  Serial.print("ADC0=");
+  Serial.print(raw);
+  Serial.print("  VSYS=");
+  Serial.print(vsys, 2);
+  Serial.println(" V");
+  delay(100);
+}
+```
+
+### STM32 Blue Pill (F103C8)
+
+<a id="ex-bpblink"></a>
+
+#### MCU: STM32 Blue Pill Blink LED (PC13)
+
+The standard Blink sketch on the STM32 Blue Pill: the on-board LED turns on and off every 0.5 s.
+
+**Wiring**
+
+- PC13 (LED_BUILTIN) → on-board LED (L)
+
+**Related usage:** Digital output & LED resistors
+
+```cpp
+// Blink: the green LED on PC13 lights when PC13 is LOW (active-low), every half second.
+void setup() {
+  pinMode(PC13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(PC13, HIGH);
+  delay(500);
+  digitalWrite(PC13, LOW);
+  delay(500);
+}
+```
+
+<a id="ex-bpadc"></a>
+
+#### MCU: Blue Pill 12-bit ADC + PWM dimming
+
+A potentiometer on PA0 is read with the 12-bit ADC (analogReadResolution(12)), an LED on PA8 is dimmed by PWM, and the active-LOW on-board LED on PC13 lights above half scale.
+
+**Wiring**
+
+- Potentiometer: ends → 3.3 / G, wiper → PA0
+- PA8 → 220 Ω Resistor → c.led.name → G
+- PC13 → on-board LED (L)
+
+**Related usage:** Analog input: potentiometer, divider, LDR / NTC · PWM: dimming & speed control · Serial debugging
+
+```cpp
+// STM32 Blue Pill: potentiometer on PA0 read with the 12-bit ADC, LED on PA8 dimmed by PWM,
+// on-board LED on PC13 (active LOW) lights above half scale.
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);
+  pinMode(PC13, OUTPUT);
+  pinMode(PA8, OUTPUT);
+}
+
+void loop() {
+  int raw = analogRead(PA0);             // 0 ... 4095
+  analogWrite(PA8, raw / 16);            // 0 ... 255
+  digitalWrite(PC13, raw > 2048 ? LOW : HIGH);
+  Serial.print("PA0=");
+  Serial.print(raw);
+  Serial.print("  ");
+  Serial.print(raw * 3.3 / 4095.0, 3);
+  Serial.println(" V");
+  delay(100);
+}
+```
+
+### 8051 MCU (STC89C52 / AT89C52, DIP-40)
+
+<a id="ex-c51blink"></a>
+
+#### MCU: 8051 Blink LED (P1.0)
+
+Classic C51 program: sbit LED = P1^0 and a delay_ms counting loop (11.0592 MHz crystal). The LED is wired VCC → 1 kΩ → LED → P1.0, so it lights when the pin is LOW.
+
+**Wiring**
+
+- Battery 5 V: + → VCC (40), − → GND (20)
+- EA (31) → VCC
+- VCC → 1 kΩ Resistor → c.led.name anode (+, long leg), cathode (−) → P1.0 (1)
+
+**Related usage:** Digital output & LED resistors · Powering the board
+
+```cpp
+// 8051 Blink: an LED from VCC through 1 kOhm to P1.0 (the port can only pull LOW strongly) - on when P1.0 = 0.
+#include <reg52.h>
+
+sbit LED = P1^0;
+
+// software delay: at 11.0592 MHz one pass of the inner loop takes about 8.7 us, 114 passes = 1 ms
+void delay_ms(unsigned int ms) {
+  unsigned int i, j;
+  for (i = ms; i > 0; i--)
+    for (j = 114; j > 0; j--);
+}
+
+void main() {
+  while (1) {
+    LED = 0;          // on
+    delay_ms(500);
+    LED = 1;          // off
+    delay_ms(500);
+  }
+}
+```
+
+<a id="ex-c51run"></a>
+
+#### MCU: 8051 running light (port P1 + direction button)
+
+Eight active-LOW LEDs on P1 show one moving dot (P1 = pattern, rotated with _crol_ / _cror_); a button from P3.2 to GND reverses the direction, read through the quasi-bidirectional pull-up.
+
+**Wiring**
+
+- Battery 5 V: + → VCC (40), − → GND (20)
+- EA (31) → VCC
+- VCC → 1 kΩ Resistor ×8 → LED Bar Graph (10-segment) anode (+, long leg)
+- LED Bar Graph (10-segment) cathode (−) → P1.7 … P1.0 (8 … 1)
+- Push Button: P3.2 (12) → GND
+
+**Related usage:** Digital output & LED resistors · Button input: pull-up, pull-down & debouncing
+
+```cpp
+// 8051 running light: 8 LEDs on P1, active LOW (VCC -> 1 kOhm -> LED -> P1.x).
+// The button on P3.2 (to GND) reverses the direction. Crystal 11.0592 MHz.
+#include <reg52.h>
+#include <intrins.h>
+
+sbit KEY = P3^2;
+
+void delay_ms(unsigned int ms) {      // about 1 ms per outer pass at 11.0592 MHz
+  unsigned int i, j;
+  for (i = ms; i > 0; i--)
+    for (j = 114; j > 0; j--);
+}
+
+void main() {
+  unsigned char pattern = 0xFE;     // one bit LOW = one LED on
+  bit left = 1;
+  while (1) {
+    P1 = pattern;
+    delay_ms(150);
+    if (KEY == 0) {                 // pressed: reverse the direction
+      left = !left;
+      while (KEY == 0);             // wait until released
+    }
+    if (left) pattern = _crol_(pattern, 1);
+    else pattern = _cror_(pattern, 1);
+  }
 }
 ```
 
