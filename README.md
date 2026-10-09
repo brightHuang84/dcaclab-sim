@@ -1,8 +1,8 @@
-# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v10.1
+# Circuit Lab · 电路实验室 (DCACLab-style simulator) — v11
 
-**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 56 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar. **v9** adds box selection and group editing (move, rotate, copy/paste, delete), selection-only export with a file-name dialog, import as replace or merge, and automatic merging of wire chains. **v10** adds programmable microcontrollers: an Arduino-Uno-style board and an ATtiny85-style 8-pin chip that run your own Arduino-C (or JavaScript) program in simulated time and drive the circuit through their pins, with a built-in code editor and serial monitor. **v10.1** adds an in-app **pinout & usage reference** for both chips (pin map, every pin's functions, electrical limits, what is simulated, common circuits, and 14 one-click examples; also as Markdown in [docs/pinout-zh.md](docs/pinout-zh.md) / [docs/pinout-en.md](docs/pinout-en.md)) and **wire colours**.
+**English:** Circuit Lab is a self-contained, offline circuit simulator that runs in your browser: drag parts onto the board, wire them up and press Run. It covers DC/AC sources, passive parts, semiconductors, logic, regulators, sensors, protection devices, driver/display modules, a multimeter and a 2-channel oscilloscope, plus 67 ready-made examples. Just open `index.html`, or use the hosted GitHub Pages site. **The UI is available in 10 languages** (简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Русский, Português (Brasil)). Pick one from the 🌐 menu in the top bar. **v9** adds box selection and group editing (move, rotate, copy/paste, delete), selection-only export with a file-name dialog, import as replace or merge, and automatic merging of wire chains. **v10** adds programmable microcontrollers: an Arduino-Uno-style board and an ATtiny85-style 8-pin chip that run your own Arduino-C (or JavaScript) program in simulated time and drive the circuit through their pins, with a built-in code editor and serial monitor. **v10.1** adds an in-app **pinout & usage reference** for both chips (pin map, every pin's functions, electrical limits, what is simulated, common circuits, and 14 one-click examples; also as Markdown in [docs/pinout-zh.md](docs/pinout-zh.md) / [docs/pinout-en.md](docs/pinout-en.md)) and **wire colours**. **v11** adds **25 new sensors** (analog modules, digital modules, and protocol sensors that work with real Arduino libraries: HC-SR04 with `pulseIn`, DHT11/DHT22 with the DHT library, DS18B20 with OneWire + DallasTemperature), an optional **signal source** on every sensed quantity, an **LCD1602 I2C** display (PCF8574 backpack, `LiquidCrystal_I2C` + `Wire`), loud **LCD wiring/contrast diagnostics**, palette search, a sensors section in the reference panel, and 11 new examples.
 
-> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。v9 新增：选择模式（框选多个器件、整体移动/旋转/复制粘贴/删除）、仅导出选中部分、导出时自定义文件名、导入时可选择替换或合并插入，以及首尾相连的导线自动合并。v10 新增：可编程单片机——Arduino Uno 风格开发板和 ATtiny85 风格 8 脚芯片，用 Arduino C（或 JavaScript）写程序，在仿真时间里运行并通过引脚驱动电路；自带代码编辑器和串口监视器。v10.1 新增：开发板/芯片的「引脚说明与用法」面板（引脚图、每个引脚的功能、电气极限、仿真支持情况、常规用法和 14 个可一键载入的示例；文档版见 [docs/pinout-zh.md](docs/pinout-zh.md)），以及导线颜色选择。
+> 中文：本项目是一个离线运行的浏览器电路仿真器，界面支持 10 种语言，可在顶栏右侧的 🌐 菜单切换。v9 新增：选择模式（框选多个器件、整体移动/旋转/复制粘贴/删除）、仅导出选中部分、导出时自定义文件名、导入时可选择替换或合并插入，以及首尾相连的导线自动合并。v10 新增：可编程单片机——Arduino Uno 风格开发板和 ATtiny85 风格 8 脚芯片，用 Arduino C（或 JavaScript）写程序，在仿真时间里运行并通过引脚驱动电路；自带代码编辑器和串口监视器。v10.1 新增：开发板/芯片的「引脚说明与用法」面板（引脚图、每个引脚的功能、电气极限、仿真支持情况、常规用法和 14 个可一键载入的示例；文档版见 [docs/pinout-zh.md](docs/pinout-zh.md)），以及导线颜色选择。v11 新增：25 种传感器（模拟模块、数字模块，以及可用真实 Arduino 库读取的 HC-SR04 / DHT11 / DHT22 / DS18B20），每个被测量都可接一个随时间变化的信号源；LCD1602 I2C 液晶屏（PCF8574 背板，LiquidCrystal_I2C 库）；液晶屏接线、对比度和初始化问题的明确提示；元件搜索；引脚说明面板的“传感器”章节；11 个新示例。
 
 This is a self-contained circuit simulator that runs in the browser, inspired by DCACLab. It is written in plain HTML, CSS and JavaScript (classic `<script>` tags). There is no build step, no CDN and no network access. The whole UI is localised (see Languages below).
 
@@ -87,6 +87,58 @@ This is a self-contained circuit simulator that runs in the browser, inspired by
 - Light colours (white, yellow) get a dark outline, and the current-flow dots switch to a dark colour on light wires, so the current animation stays visible on every colour.
 - Tip (common convention): red = +V, black = GND, other colours for signals.
 
+## Sensors (v11) / 传感器
+All sensors are in the **传感器 / Sensors** palette category (the palette now also has a **search box**: name in the UI language, English name, type id or description). Every sensor has:
+- the **measured quantity** as a property with a slider *and* a number box with units, plus a live **readings** block (quantity, output voltage/level, internal resistance or pulse width where relevant);
+- an optional **signal source** (信号源) on the quantity: constant, sine, triangle, square or ramp (sawtooth), between *min* and *max* with a *period*, so the quantity changes with simulated time (e.g. an ultrasonic distance that sweeps 15–250 cm);
+- the real module pin names and its own drawing; names, descriptions, properties and readings in all 10 languages;
+- save / load like any other part.
+
+| Part | Pins | Key properties / model (5 V supply unless noted) | Read with |
+|---|---|---|---|
+| Photoresistor module | VCC GND DO AO | 0–10 000 lx; GL5528-class LDR (≈ 15 kΩ at 10 lx) against 10 kΩ; LM393 DO with threshold trimmer | `analogRead` / `digitalRead` |
+| MQ gas sensor module | VCC GND DO AO | 0–10 000 ppm; MQ-2 (LPG curve) or MQ-135 (NH₃ curve), Rs/R0 from a simplified log-log curve, R0 and load RL adjustable; heater ≈ 33 Ω (≈ 150 mA) | AO / DO |
+| Flame sensor module | VCC GND DO AO | IR intensity 0–100 % (760–1100 nm photodiode); more IR → lower AO | AO / DO |
+| Soil moisture sensor | VCC GND DO AO | 0–100 %; probe resistance against 10 kΩ, wetter → lower AO | AO / DO |
+| Rain sensor | VCC GND DO AO | 0–100 % water on the plate, wetter → lower AO | AO / DO |
+| Thermistor module | VCC GND DO AO | −20–100 °C; 10 kΩ NTC, B = 3950, against 10 kΩ | AO / DO |
+| Sound sensor (envelope) | VCC GND DO AO | 30–110 dB; electret + amplifier + envelope; DO high above the threshold | AO / DO |
+| TCRT5000 line tracker | VCC GND DO AO | reflectance 0–100 %; white → AO low / DO low, black line → DO high | AO / DO |
+| Water level sensor | S + − | immersion 0–40 mm | `analogRead` |
+| LM35 | +Vs Vout GND | Vout = 10 mV/°C (25 °C → 250 mV); supply 4–30 V | `analogRead` |
+| TMP36 | +Vs Vout GND | Vout = 0.5 V + 10 mV/°C (25 °C → 750 mV), −40…125 °C, 2.7–5.5 V | `analogRead` |
+| Flex sensor | 1 2 | ≈ 25 kΩ flat, rising with bend (≈ 125 kΩ at 180°); use in a divider | `analogRead` |
+| FSR (force-sensitive resistor) | 1 2 | > 10 MΩ unloaded, R ≈ 10 kΩ / F[N] (min 250 Ω); use in a divider | `analogRead` |
+| Joystick module | GND +5V VRx VRy SW | two 10 kΩ pots, centre ≈ VCC/2; SW to GND (needs `INPUT_PULLUP`) | `analogRead` ×2 + `digitalRead` |
+| ACS712 current sensor | VCC OUT GND IP+ IP− | OUT = VCC/2 + k·I; k = 185 mV/A (5 A), 100 mV/A (20 A), 66 mV/A (30 A); IP+→IP− is a real isolated 1.2 mΩ path, so it can measure a current in your circuit or a set value | `analogRead` |
+| Pressure sensor (analog) | +5V GND OUT | generic 0.5–4.5 V ratiometric; MPX5010DP Vout = Vs·(0.09·P + 0.04); MPX5700AP Vout = Vs·(0.0012858·P + 0.04), P in kPa | `analogRead` |
+| HC-SR501 PIR | VCC OUT GND | OUT 3.3 V for Tx (3–300 s), H (retrigger) / L mode, ≈ 2.5 s block time; supply 4.5–20 V; click = someone walks past | `digitalRead` |
+| IR obstacle sensor (FC-51 type) | OUT GND VCC | distance 0–100 cm, detection range 2–30 cm (trimmer); OUT low when an obstacle is in range | `digitalRead` |
+| Tilt switch SW-520D | 1 2 | ball switch: closed upright, open when tilted | `digitalRead` |
+| SW-420 vibration module | VCC GND DO | DO low at rest, high on vibration above the threshold; click = knock | `digitalRead` |
+| TTP223 touch module | VCC I/O GND | 2.0–5.5 V; momentary active-high by default, toggle / active-low options (A/B pads); hold = touch | `digitalRead` |
+| KY-040 rotary encoder | GND + SW DT CLK | one CLK and one DT pulse per detent, CLK leads clockwise; 10 kΩ pull-ups on CLK/DT, SW to GND; click left/right half = one step, wheel = rotate, or set a continuous spin | `digitalRead` |
+| HC-SR04 ultrasonic | VCC Trig Echo GND | 2–400 cm (slider to 450 to test out-of-range); Trig ≥ 10 µs → Echo high for 2·d / c (≈ 58 µs/cm), air temperature sets the speed of sound (331.3 + 0.606·T m/s); ≈ 38 ms when out of range | `pulseIn(echo, HIGH)` |
+| DHT11 / DHT22 | VCC DATA GND | temperature and humidity; DHT11 0–50 °C / 20–90 %RH integer values, DHT22 −40–80 °C / 0–100 %RH at 0.1 resolution; at least 2 s between reads | `DHT` library |
+| DS18B20 | GND DQ VDD | −55…125 °C, 3.0–5.5 V, 9–12-bit resolution (0.5…0.0625 °C); DQ needs 4.7 kΩ to VDD; 85 °C before the first conversion | `OneWire` + `DallasTemperature` |
+| LCD1602 I2C (in 驱动与显示模块) | GND VCC SDA SCL | PCF8574 backpack, address 0x20–0x27 (PCF8574T) or 0x38–0x3F (PCF8574AT), default 0x27; contrast trimmer, backlight jumper; SDA/SCL = A4/A5 on the Uno, PB0/PB2 on the ATtiny85 | `LiquidCrystal_I2C` + `Wire` |
+
+The older sensor parts (LDR, NTC, Hall, reed switch, phototransistor) are unchanged and also live in this category.
+
+**Libraries for sensors (Arduino C mode):**
+- `#include <DHT.h>`: `DHT dht(pin, DHT11|DHT22)`, `begin() readTemperature([isF]) readHumidity() computeHeatIndex(t, h[, isF]) convertCtoF convertFtoC`. Reads fail (`NAN`) when the sensor is not powered, DATA is not on that pin or the sensor is read faster than every 2 s (the last value is returned, as in the library); a toast names the pin.
+- `#include <OneWire.h>` + `#include <DallasTemperature.h>`: `OneWire ow(pin); DallasTemperature s(&ow);` with `begin() getDeviceCount() requestTemperatures() getTempCByIndex(i) getTempFByIndex(i) setResolution(bits)`. Without a pull-up or without power the read returns `-127` (`DEVICE_DISCONNECTED_C`) and a toast says what is missing.
+- `pulseIn()` on the HC-SR04 Echo pin returns the exact echo width (not quantised to Δt).
+- `#include <Wire.h>` + `#include <LiquidCrystal_I2C.h>`: `LiquidCrystal_I2C lcd(0x27, 16, 2);` with `init() begin() clear() home() setCursor() print() println() write() backlight() noBacklight() display() noDisplay() cursor() noCursor() blink() noBlink() scrollDisplayLeft/Right() leftToRight() rightToLeft() autoscroll() noAutoscroll() createChar()`; `Wire.begin() beginTransmission() write() endTransmission()` (address scan works; `endTransmission` returns 0 or 2). `Wire.requestFrom()` and other I2C devices are not supported and give a clear error.
+
+## LCD diagnostics (v11) / 液晶屏诊断
+Driving the parallel LCD1602 from a board was always simulated (`LiquidCrystal`, 4-bit or 8-bit), but problems were silent. Now the simulator says why the screen stays blank:
+- **Wrong pin mapping:** the LCD checks that RS, E and D4–D7 really go to the pins in the `LiquidCrystal lcd(rs, en, d4, d5, d6, d7)` constructor and names the mismatch (e.g. "D7 应接 D2，实际接在 D6"). When D4–D7 go to the right pins in the wrong order it says so (**reversed** or **swapped**), e.g. for D4…D7 wired to D2…D5 while the code says `lcd(12, 11, 5, 4, 3, 2)`: "D4–D7 的顺序与程序正好相反 …", and it suggests the matching constructor (`LiquidCrystal lcd(12, 11, 2, 3, 4, 5);`).
+- **No `lcd.begin()`:** nothing is shown, as on hardware, with a hint to call `lcd.begin(16, 2)`.
+- **Contrast:** V0 is modelled; the characters fade out as V0 rises (VDD − V0 must be about 3 V or more; best at V0 ≈ 0.3–1 V on a 5 V supply). With the pot in the middle (V0 ≈ 2.5 V) the text is barely visible, and a toast says to turn the pot towards GND. A floating V0 is treated as pulled low.
+- **No power / no common ground** is reported; the 6- and 7-argument constructors (the latter with an RW pin) are supported; printing before `begin()` shows nothing, as on hardware, and the toast explains it.
+- **I2C module code with a parallel LCD:** `LiquidCrystal_I2C` used to fail with "unknown type"; it is now supported with the new LCD1602 I2C part, and if the code is I2C but the circuit has the parallel LCD (or vice versa), the toast says so. Address mismatch shows **I2C 地址不匹配** with both addresses; swapped SDA/SCL, wrong pins and an unpowered backpack are named as well.
+
 ## Pinout & usage reference (v10.1) / 引脚说明与用法
 - Open it with **📌 引脚说明 / Pinout** in the program editor's toolbar or in the chip's properties panel. It is a scrollable, draggable, resizable window placed beside the editor, with a toggle between **Arduino Uno** and **ATtiny85**, and follows the UI language (all 10 locales).
 - Contents: an SVG **pin map**; a **table of every pin** (functions as coloured tags, notes, and whether the simulator supports it: ✓ / partial / ✗ / pin not on the part, with non-simulated functions dashed); **electrical limits**; **what is simulated**; **usage sections** (digital output and LED resistor, buttons with pull-up/pull-down and debounce, analog input with pot / divider / LDR / NTC, PWM, motors via transistor/MOSFET + flyback diode, relays, tone, servo, LCD1602, Serial, `millis()` multitasking, powering the board); and **examples** at the end, each with description, wiring, code and the buttons **载入到画布** (load and run), **插入编辑器** (put the code into the current chip's editor, not uploaded yet) and **复制代码**.
@@ -141,6 +193,7 @@ Two programmable parts live in the new **单片机 Microcontrollers** palette ca
 | Drivers & displays 驱动与显示模块 (v7) | TL431 shunt reference (REF/A/K, 2.495 V, 1 mA minimum cathode current), LM393 dual open-collector comparator (8-pin DIP, real pinout), active crystal oscillator (VCC/GND/OUT, 50 % square wave at the set frequency), active buzzer (DC → 2.3 kHz tone, polarised), passive buzzer (16 Ω + L, sounds at the drive frequency), 1-channel relay module (VCC/GND/IN, NO/COM/NC; high- or low-level trigger, opto input, 8 ms pull-in / 4 ms release), 4×4 membrane keypad (click a key to short its row and column), LCD1602 (16-pin header, contrast from VDD−V0, backlight via on-board 100 Ω, text set by properties with `{V}`/`{t}` tokens), L298N dual H-bridge module (OUT1–4, +12 V, GND, +5 V, ENA/IN1–IN4/ENB with jumpers, ≈2 V saturation drop, flyback diodes, on-board 5 V regulator) |
 | Switches 开关 | Switch, push button; relay (SPDT); **v6:** 4-pin tactile button, SPDT slide switch, DPDT toggle switch, 1P4T rotary switch, 4-way DIP switch |
 | Meters 仪表 | Ammeter, voltmeter; multimeter with COM / VΩ / 10A jacks; 2-channel oscilloscope (**Y-T, X-Y and FFT modes**) |
+| Sensors 传感器 (v11) | 25 new parts, see *Sensors (v11)* above; LCD1602 I2C in Drivers & displays |
 | Microcontrollers 单片机 (v10) | Arduino Uno-style board (USB or VIN power, D0–D13, A0–A5, PWM, on-board L LED) and ATtiny85-style DIP-8 chip, both programmable in Arduino C or JavaScript (see *Microcontrollers*) |
 | Other 其他 | Breadboard (20, 30 or 40 columns); ground; wire |
 
@@ -309,6 +362,8 @@ Users should never have to touch solver settings. v7 reworks the nonlinear solve
   - On v7: 0 failures, Vout = 5.000 V, LED = 20 mA, 7805 Vin ≈ 8.2–8.3 V.
 
 ## Examples
+**v11 (传感器):** HC-SR04 ultrasonic → LCD1602 · DHT22 → serial monitor · PIR + light-sensor night light · soil moisture alarm (buzzer) · MQ-2 gas alarm (relay) · LM35 thermometer · two-channel TCRT5000 line tracker · KY-040 encoder counter · ACS712 current monitor · DS18B20 thermometer · I2C LCD1602 (PCF8574) with TMP36. All are in the examples menu and in the reference panel's 传感器 section (load / insert / copy).
+
 **v10.1 (单片机):** debounced button · LDR night light · millis() multitasking · MOSFET motor PWM · relay timer · tone() melody · ATtiny85 PWM fade.
 
 **v10 (单片机):** Arduino blink · traffic light · button with INPUT_PULLUP · potentiometer → PWM with Serial and scope · servo sweep · LiquidCrystal LCD1602 · ATtiny85 blink.
@@ -330,6 +385,8 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - the new examples are in the examples menu; all 14 examples load from the panel and run with no runtime error, no non-converged step and no warning, with behaviour checks on their output (debounced press count, night-light PWM value, multitask uptime, motor speed, relay ON → OFF, tone notes, both ATtiny fade LEDs);
   - insert into editor, upload, board mismatch warning, no-chip message, copy to clipboard;
   - wire colours: palette in the panel, single and multi-wire change as one undo/redo step, custom picker, remembered colour for new wires (also after reload), save/load, selection export, old files without colour, different colours not merged while same colours merge, the outline on white wires; the colour UI in 10 languages.
+- `test13.js` runs **62 v11 checks**: every v11 key in all 10 locales with placeholders; all 26 new parts place, converge and show readings with no raw keys (and no Chinese in en/ru); datasheet values (LM35 25 °C → 250 mV, TMP36 25 °C → 750 mV, ACS712-5A 5 A → 2.5 + 0.185·5 = 3.425 V, ACS712-20A at −10 A, MPX5010DP, ACS712 measuring a real 2 A current); HC-SR04 at 100 cm → 5.83 ms within 2 %, 30 cm, out of range; DHT22 and DHT11 values through the DHT library, DHT not wired → fail + toast; DS18B20 −10.3125 °C, missing pull-up → −127 + toast; encoder counts; PIR level; signal source animation; save/load; LCD diagnostics (contrast, wrong pin, the user case D4–D7 → D2–D5 reversed with the suggested fix verified, swapped order, no begin, 7-arg constructor, I2C code with a parallel LCD); I2C LCD (text, address mismatch, 0x3F, swapped/wrong pins, unpowered, backlight, Wire.requestFrom error, ATtiny85 PB0/PB2); all 11 sensor examples run 3 s with no error or warning; palette search; the reference panel's sensors section in all 10 locales; no page errors.
+- `shots12.js` makes screenshots 64–70 (sensor category, ultrasonic + LCD running, DHT22 + serial monitor, signal-source properties, PIR + light multi-sensor circuit, I2C LCD running, the reference sensors section).
 - `shots11.js` makes screenshots 58–63 (Uno pinout panel, ATtiny85 pinout panel, a usage section, the examples section, a new example running, coloured wires).
 - `test11.js` runs **81 v10 microcontroller checks** (74 at v10, plus the new examples):
   - translator: a program using most of the C subset prints 40 values that are compared line by line with AVR semantics (16-bit wrap, truncating division, `%` sign, unsigned wrap, HEX/BIN printing, macros, enums, static locals, recursion, `String`, `switch` fall-through, 2-D arrays, `sprintf`, `strcpy/strcat` …);
@@ -425,13 +482,24 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - The stopped DC operating point uses t = 0 for time-varying sources, and treats logic, 555 and relay state as it currently is (initial state before a run).
   - AC ranges need a run to measure RMS.
   - Ω mode on a charged capacitor in a paused circuit ignores the stored charge (Ω is always a DC solve).
+- v11 sensors (simplifications):
+  - Sensors are driven by their property / signal source, not by a physical scene (no moving objects, sound field or gas diffusion).
+  - DHT11/22 and DS18B20 are modelled at **library level**: the DHT and OneWire/DallasTemperature calls check power, ground, the data pin and the pull-up in the circuit and return the sensor's value. For the DHT the host start pulse and the sensor's 40-bit answer are drawn on the DATA line (visible on the scope), but the library decodes the bits from the sensor model rather than by sampling the pin; DS18B20 bus traffic is not drawn. Library call durations are approximate.
+  - I2C is also **library level** and only for the LCD1602 I2C part: no waveform on SDA/SCL, no other I2C devices, no `Wire.requestFrom()`. The backpack's pull-ups and supply current are modelled.
+  - LCD libraries: `createChar()` is accepted but custom glyphs are not drawn; `cursor`/`blink` (no visible cursor), `autoscroll`, `leftToRight`/`rightToLeft` are accepted but have no visible effect.
+  - The parallel LCD is still written at display-memory level (no HD44780 bus timing); V0 contrast is an empirical visibility curve, and a floating V0 is modelled as pulled down through an internal ≈ 22 kΩ.
+  - MQ gas sensors ignore heater warm-up, humidity and temperature; the curve is a single power law per model.
+  - The sound module's AO is linear in dB between 40 and 100 dB; no audio waveform.
+  - LM35 in the single-supply circuit does not go below 0 V (negative temperatures need a negative supply, as on the real part).
+  - SW-520D tilt switch: closed below 30°, open above 60°, hysteresis in between (simplified). Flex sensor and FSR use simplified curves (linear bend, R ≈ 10 kΩ/F). The water-level and soil/rain curves are simplified monotonic curves, not calibrated to a specific board.
+  - HC-SR501 has no warm-up time and no sensitivity range; HC-SR04 has no beam angle, minimum-target size or echoes.
 - v10.1 pinout reference and wire colours:
   - The reference documents pins and functions the simulated parts do not have or do not simulate (RESET/AREF/IOREF/ICSP headers on the Uno, external interrupts, I²C, SPI, hardware UART pins, the ATtiny85 USI and clock pins); these are clearly marked as not simulated.
   - Library side effects listed in the text (e.g. `tone()` disabling PWM on D3/D11, `Servo` disabling PWM on D9/D10) are real-hardware facts and are not modelled.
   - Serial on the ATtiny85 is a virtual monitor (the real chip has no hardware UART).
   - Wires of different colours are not merged, so a recoloured chain stays as several wires.
 - v10 microcontrollers:
-  - The C dialect is a subset: no pointers, references, `struct`/`class`/`union`, templates, `goto`, function pointers, `new`/`delete`, interrupts (`attachInterrupt`, ISRs, timers/registers such as `PORTB`, `DDRB`), EEPROM, Wire (I²C), SPI or SoftwareSerial. Unsupported syntax gives a clear "不支持的语法" error with the line number rather than a wrong result.
+  - The C dialect is a subset: no pointers, references, `struct`/`class`/`union`, templates, `goto`, function pointers, `new`/`delete`, interrupts (`attachInterrupt`, ISRs, timers/registers such as `PORTB`, `DDRB`), EEPROM, Wire (I²C) beyond the LCD1602 I2C subset (v11), SPI or SoftwareSerial. Unsupported syntax gives a clear "不支持的语法" error with the line number rather than a wrong result.
   - Program execution is not cycle-accurate: each statement costs a fixed small amount of simulated time, so tight loops run at roughly real speed but not to the clock cycle. `millis()` is exact; `micros()` has 1 µs resolution.
   - Inputs (`digitalRead`, `analogRead`, `pulseIn`) see the circuit as solved at the start of the current time step (200 µs by default), so `pulseIn` and very fast polling have Δt resolution. Outputs are exact to the event (the step is split).
   - PWM, `tone()` and Servo frames are real switching only when their period is at least 4 Δt; faster signals (e.g. `tone` above ≈ 1.2 kHz at the default Δt) are averaged to their duty cycle.

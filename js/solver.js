@@ -20,6 +20,9 @@ const SPARSE_MIN_N = 40;   // use the sparse solver from this many unknowns up
 // user-adjustable solver options (Settings › 高级仿真设置); defaults need no tuning
 const SIMOPT_DEFAULTS = { maxIter: 100, reltol: 1e-4, vntol: 1e-6, abstol: 1e-6, gmin: 1e-12, autoStep: true, minStep: 1e-9, homotopy: true, kclCheck: true };
 const SIMOPT = Object.assign({}, SIMOPT_DEFAULTS);
+// v11: time of the solve in progress (end of the current (sub-)step); time-dependent device models (sensor signal
+// sources, timed digital outputs) read it so every Newton iteration of one solve sees the same instant
+const SIMCLK = { t: 0 };
 const SIMOPT_KEY = 'dcaclab-simopt';
 function saveSimOpt() { try { const d = {}; for (const k in SIMOPT) if (SIMOPT[k] !== SIMOPT_DEFAULTS[k]) d[k] = SIMOPT[k]; if (Object.keys(d).length) localStorage.setItem(SIMOPT_KEY, JSON.stringify(d)); else localStorage.removeItem(SIMOPT_KEY); } catch (e) { /* ignore */ } }
 try { if (typeof localStorage !== 'undefined' && !/[?&]fresh=1/.test(location.search)) { const d = JSON.parse(localStorage.getItem(SIMOPT_KEY) || '{}'); for (const k in d) if (k in SIMOPT_DEFAULTS && typeof d[k] === typeof SIMOPT_DEFAULTS[k]) SIMOPT[k] = d[k]; } } catch (e) { /* ignore */ }
@@ -541,6 +544,7 @@ class MNA {
     return this._cutStep(t0, h / 2, depth + 1) && this._cutStep(t0 + h / 2, h / 2, depth + 1);
   }
   _stepOnce(t, homo) {
+    SIMCLK.t = t;
     const snap = this.hasAcc && !this._redo ? this.snapshot() : null;
     if (this.needStamp) this.finalize(this.dt, 'be');
     else if (this.method === 'be' && this.beSteps-- <= 0) this.finalize(this.dt, 'trap');

@@ -9,6 +9,7 @@
 - [Arduino Uno 开发板](#arduino)
 - [ATtiny85 单片机 (8 脚)](#attiny85)
 - [常规用法](#usage)
+- [传感器](#sensors)
 - [示例](#examples)
 
 <a id="arduino"></a>
@@ -108,10 +109,10 @@ ATtiny85（8 脚 DIP，AVR 8 位）：5 个通用 IO PB0–PB4，另有 PB5（�
 
 ## 仿真支持
 
-✓ 仿真支持：`pinMode` / `digitalWrite` / `digitalRead`（含 `INPUT_PULLUP`）、`analogRead`（10 位）、`analogWrite`（PWM 频率与真实芯片一致）、`millis` / `micros` / `delay`、`tone` / `noTone`、`pulseIn`、`shiftOut`、Servo、LiquidCrystal、`Serial`（串口监视器）等。引脚的输出电阻、上拉电阻和电流都参与电路求解，单脚超过 40 mA 会给出警告。
+✓ 仿真支持：`pinMode` / `digitalWrite` / `digitalRead`（含 `INPUT_PULLUP`）、`analogRead`（10 位）、`analogWrite`（PWM 频率与真实芯片一致）、`millis` / `micros` / `delay`、`tone` / `noTone`、`pulseIn`、`shiftOut`、Servo、LiquidCrystal、LiquidCrystal_I2C、DHT、OneWire + DallasTemperature、`Serial`（串口监视器）等。引脚的输出电阻、上拉电阻和电流都参与电路求解，单脚超过 40 mA 会给出警告。
 
 - ✗ 外部中断 `attachInterrupt()`：编译时提示不支持，请改用轮询或 `millis()`。
-- ✗ I²C（Wire 库）、SPI 库以及串口的引脚级时序：D0/D1、A4/A5、D10–D13 的通信功能不模拟，`Serial` 只连接串口监视器。
+- ✗ SPI 库、串口的引脚级时序以及通用 I²C：D0/D1、D10–D13 的通信功能不模拟，`Serial` 只连接串口监视器；A4/A5 上的 I²C 只支持 I2C 液晶屏 (LiquidCrystal_I2C，库函数层面)，`Wire` 只支持 begin / beginTransmission / write / endTransmission。
 - ✗ 库对定时器的副作用（tone 使 D3/D11 的 PWM 失效、Servo 使 D9/D10 的 PWM 失效）只在说明中提示，仿真中不会出现。
 - ✗ Uno 元件没有 RESET、AREF、IOREF、单独的 SDA/SCL 排针和 ICSP 接口；`analogReference(EXTERNAL)` 按 VCC 处理，`INTERNAL` = 1.1 V。
 - ✗ ATtiny85 没有硬件串口：仿真中的 `Serial` 是虚拟的，只用于把调试信息输出到串口监视器。
@@ -297,9 +298,11 @@ void loop() {
 
 LCD1602（HD44780 控制器）在 4 位模式下只需 6 根信号线：RS、E、D4–D7，RW 接 GND（只写）；也可以用 7 个参数的写法把 RW 接到引脚。`LiquidCrystal lcd(rs, en, d4, d5, d6, d7)`，然后 `lcd.begin(16, 2)`、`lcd.setCursor(列, 行)`、`lcd.print()`、`lcd.clear()`。
 
-电源：VSS 接 GND，VDD 接 5V；V0 调对比度，通常接 10 kΩ 电位器的中间抽头（两端接 5V/GND），调不好时屏幕全黑或什么也看不到。A/K 是背光 LED：A 经限流电阻接 5V（很多模块已内置电阻）或接引脚控制开关，K 接 GND。
+电源：VSS 接 GND，VDD 接 5V；V0 调对比度，通常接 10 kΩ 电位器的中间滑动端 (两端接 5V/GND)，V0 约 0.3–1 V 时最清楚。V0 太高 (例如电位器在中间，约 2.5 V) 字太淡看不见；V0 直接接 GND 字偏深但可读。A/K 是背光 LED：A 经限流电阻 (如 220 Ω) 接 5V 或接引脚控制开关，K 接 GND。
 
-引脚不够时可以用 I²C 转接板（PCF8574，只占 A4/A5），但本仿真器不支持 I²C，请使用并行接法。行和列都从 0 开始：第二行是 `setCursor(0, 1)`。
+引脚不够时可以用 I²C 背板 (PCF8574)：元件“LCD1602 液晶屏 (I2C 背板)”支持 LiquidCrystal_I2C 库，SDA 接 A4、SCL 接 A5 (ATtiny85 为 PB0 / PB2)，地址 0x27 或 0x3F。I²C 只对这个元件在库函数层面模拟。行和列都从 0 开始：第二行是 `setCursor(0, 1)`。
+
+液晶屏没有显示时依次检查：① 对比度——电位器在中间时 V0 ≈ 2.5 V，字太淡看不见，要调到 V0 ≈ 0.3–1 V；② LiquidCrystal lcd(…) 里的引脚号是否与 RS、E、D4–D7 的实际接线一致 (不一致时会提示具体哪一根接错)；③ setup() 里是否调用了 lcd.begin(16, 2)；④ VDD 是否接 5V，VSS 是否与开发板共地。
 
 ```cpp
 #include <LiquidCrystal.h>
@@ -316,7 +319,7 @@ void loop() {
 }
 ```
 
-*相关示例:* [单片机：LCD1602 显示计数 (LiquidCrystal)](#ex-ardlcd)
+*相关示例:* [单片机：LCD1602 显示计数 (LiquidCrystal)](#ex-ardlcd) · [单片机：I2C 液晶屏 (LCD1602 + PCF8574)](#ex-snlcdi2c)
 
 ### 串口调试
 
@@ -368,6 +371,485 @@ void loop() {
 ```
 
 *相关示例:* [单片机：millis() 多任务 (不用 delay)](#ex-ardmulti) · [单片机：按键消抖 切换 LED (millis)](#ex-arddebounce)
+
+<a id="sensors"></a>
+
+## 传感器
+
+传感器元件都在元件库的“传感器”分类里。下表列出每个元件的引脚和程序读取方式；被测量可以在属性面板里直接设置 (滑块 + 数值)，也可以选一个随仿真时间变化的信号源。
+
+| 元件 | 引脚 | 程序读取方式 |
+|---|---|---|
+| **光敏电阻模块** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **MQ 气体传感器模块** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **火焰传感器模块** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **土壤湿度传感器** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **雨滴传感器** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **热敏电阻模块** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **声音传感器 (包络输出)** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **TCRT5000 循迹模块** | VCC · GND · DO · AO | AO → `analogRead()`；DO (LM393 比较器，阈值由板上电位器设定) → `digitalRead()` |
+| **水位传感器** | S · + · − | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **LM35 温度传感器** | +Vs · Vout · GND | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **TMP36 温度传感器** | +Vs · Vout · GND | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **弯曲传感器** | 1 · 2 | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **薄膜压力传感器 (FSR)** | 1 · 2 | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **双轴摇杆模块** | GND · +5V · VRx · VRy · SW | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **ACS712 电流传感器** | VCC · OUT · GND · IP+ · IP− | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **压力传感器 (模拟输出)** | +5V · GND · OUT | 输出电压 → `analogRead()` (0–1023 对应 0–5 V) |
+| **HC-SR501 人体红外传感器** | VCC · OUT · GND | 数字输出 → `digitalRead()` (有效电平见元件说明) |
+| **红外避障模块** | OUT · GND · VCC | 数字输出 → `digitalRead()` (有效电平见元件说明) |
+| **倾斜开关 (SW-520D)** | 1 · 2 | 数字输出 → `digitalRead()` (有效电平见元件说明) |
+| **SW-420 振动传感器模块** | VCC · GND · DO | 数字输出 → `digitalRead()` (有效电平见元件说明) |
+| **TTP223 触摸模块** | VCC · I/O · GND | 数字输出 → `digitalRead()` (有效电平见元件说明) |
+| **KY-040 旋转编码器** | GND · + · SW · DT · CLK | CLK / DT → `digitalRead()` 判断方向，SW → `INPUT_PULLUP` |
+| **HC-SR04 超声波测距** | VCC · Trig · Echo · GND | Trig 输出 ≥ 10 µs 高电平，`pulseIn(echo, HIGH)` 测 Echo 脉宽；距离 (cm) ≈ 脉宽 (µs) / 58 |
+| **DHT11 / DHT22 温湿度传感器** | VCC · DATA · GND | `#include <DHT.h>`：`DHT dht(pin, DHT22); dht.begin();` 然后 `dht.readTemperature()` / `dht.readHumidity()` |
+| **DS18B20 数字温度传感器** | GND · DQ · VDD | `OneWire` + `DallasTemperature`：`sensors.begin(); sensors.requestTemperatures(); sensors.getTempCByIndex(0);` (DQ 需 4.7 kΩ 上拉) |
+| **LCD1602 液晶屏 (I2C 背板)** | GND · VCC · SDA · SCL | `LiquidCrystal_I2C lcd(0x27, 16, 2); lcd.init(); lcd.backlight();`，SDA → A4，SCL → A5 |
+
+- 带 DO 的模块用 LM393 比较器把 AO 与阈值比较，板上指示灯随 DO 变化。不同模块的有效电平不同 (例如光敏、火焰、土壤模块是低电平有效，声音和 SW-420 模块是高电平有效)，具体见每个元件的说明。
+- 信号源：每个传感器的主要被测量都可以选择正弦、三角波、方波或斜坡，并设置最小值、最大值和周期，仿真运行时自动变化，不用手动拖动滑块就能测试程序。
+- 模拟量换算：电压 = 读数 × 5 / 1023。LM35 每 °C 输出 10 mV，配合 `analogReference(INTERNAL)` (1.1 V) 分辨率约 0.1 °C；ACS712 在零电流时输出 VCC/2。
+- DHT、DS18B20 和 I2C 液晶屏在库函数层面模拟：数据线必须接到程序里写的引脚，并且供电、共地正确，否则读数为 NaN / −127 或液晶屏没有显示，原因会显示在提示和开发板的读数里。
+
+<a id="ex-snsultra"></a>
+
+### 传感器：超声波测距 → LCD1602
+
+HC-SR04 大约每 100 ms 测一次距离 (`pulseIn` 测 Echo 脉宽)，距离显示在 LCD1602 上，Echo 脉宽 (µs) 输出到串口。目标距离由正弦信号源在 15–250 cm 之间变化；V0 经 100 kΩ 接 5V，与屏内下拉形成约 0.9 V 的对比度电压。
+
+**接线**
+
+- HC-SR04 超声波测距: VCC → 5V, GND → GND, Trig → D7, Echo → D6
+- LCD1602 液晶屏: RS → D3, RW → D4, E → D5, D4…D7 → D9…D12, A → D13, K / VSS → GND, VDD → 5V, V0 → 100 kΩ → VDD
+
+```cpp
+// Ultrasonic distance meter: HC-SR04 (Trig = D7, Echo = D6) shown on an LCD1602.
+// Echo pulse width in microseconds / 58 = distance in cm (sound: about 0.0343 cm/us, there and back).
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(3, 4, 5, 9, 10, 11, 12);   // RS, RW, E, D4..D7
+const int TRIG = 7;
+const int ECHO = 6;
+
+void setup() {
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);        // backlight
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  lcd.begin(16, 2);
+  lcd.print("HC-SR04 distance");
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);      // trigger pulse of 10 us
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  unsigned long us = pulseIn(ECHO, HIGH, 30000);   // 0 = no echo within 30 ms
+  lcd.setCursor(0, 1);
+  if (us == 0) {
+    lcd.print("out of range    ");
+  } else {
+    float cm = us / 58.0;
+    lcd.print(cm, 1);
+    lcd.print(" cm          ");
+  }
+  Serial.println(us);
+  delay(100);
+}
+```
+
+<a id="ex-sndht"></a>
+
+### 传感器：DHT22 温湿度 → 串口监视器
+
+用 DHT 库每 2 秒读取一次 DHT22 的温度、湿度并计算体感温度，输出到串口监视器。温度由正弦信号源在 18–32 °C 之间变化。
+
+**接线**
+
+- DHT11 / DHT22 温湿度传感器: VCC → 5V, DATA → D2, GND → GND
+
+```cpp
+// DHT22 temperature and humidity -> serial monitor every 2 s (DHT library).
+#include <DHT.h>
+
+DHT dht(2, DHT22);            // DATA on pin 2
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+}
+
+void loop() {
+  delay(2000);                // the sensor needs 2 s between readings
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  if (isnan(h) || isnan(t)) {
+    Serial.println("DHT read failed - check the wiring");
+    return;
+  }
+  Serial.print("T = ");
+  Serial.print(t, 1);
+  Serial.print(" C   RH = ");
+  Serial.print(h, 1);
+  Serial.print(" %   heat index = ");
+  Serial.print(dht.computeHeatIndex(t, h, false), 1);
+  Serial.println(" C");
+}
+```
+
+<a id="ex-snpir"></a>
+
+### 传感器：人体感应小夜灯 (PIR + 光敏)
+
+HC-SR501 检测到有人移动、并且光敏模块判断为天黑时，点亮 D9 上的 LED 10 秒。PIR 的“有人移动”由方波信号源模拟，也可以单击 PIR 元件。
+
+**接线**
+
+- HC-SR501 人体红外传感器: VCC → 5V, OUT → D2, GND → GND
+- 光敏电阻模块: AO → A0, VCC → 5V, GND → GND
+- D9 → 220 Ω → LED → GND
+
+```cpp
+// PIR night light: the LED on pin 9 stays on for 10 s after motion, but only when it is dark.
+const int PIR = 2;
+const int LED = 9;
+const int DARK = 600;          // AO of the light-sensor module rises in the dark
+unsigned long onUntil = 0;
+
+void setup() {
+  pinMode(PIR, INPUT);
+  pinMode(LED, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int light = analogRead(A0);
+  if (digitalRead(PIR) == HIGH && light > DARK) {
+    if (millis() >= onUntil) Serial.println("motion in the dark: light on");
+    onUntil = millis() + 10000;
+  }
+  digitalWrite(LED, millis() < onUntil ? HIGH : LOW);
+  delay(20);
+}
+```
+
+<a id="ex-snsoil"></a>
+
+### 传感器：土壤湿度报警 (蜂鸣器)
+
+土壤湿度传感器 AO 接 A0：土壤太干 (读数高) 时 D8 上的有源蜂鸣器报警。湿度由三角波信号源在 10–90 % 之间变化。
+
+**接线**
+
+- 土壤湿度传感器: AO → A0, VCC → 5V, GND → GND
+- 有源蜂鸣器: + → D8, − → GND
+
+```cpp
+// Soil moisture alarm: beeps while the soil is too dry (AO is high when the soil is dry).
+const int BUZZER = 8;
+const int DRY = 700;
+
+void setup() {
+  pinMode(BUZZER, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int v = analogRead(A0);
+  Serial.print("soil AO = ");
+  Serial.println(v);
+  if (v > DRY) {
+    digitalWrite(BUZZER, HIGH);
+    delay(200);
+    digitalWrite(BUZZER, LOW);
+    delay(300);
+  } else {
+    digitalWrite(BUZZER, LOW);
+    delay(500);
+  }
+}
+```
+
+<a id="ex-sngas"></a>
+
+### 传感器：气体浓度报警 (MQ-2 + 继电器)
+
+MQ-2 的 AO 超过设定值或 DO 变低时，D8 的继电器 (例如接风扇) 和 D9 的红色 LED 打开。气体浓度由正弦信号源在 0–3000 ppm 之间变化。
+
+**接线**
+
+- MQ 气体传感器模块: AO → A0, DO → D7, VCC → 5V, GND → GND
+- 继电器模块 (1 路): IN → D8, VCC → 5V, GND → GND
+- D9 → 220 Ω → LED → GND
+
+```cpp
+// Gas alarm with an MQ-2 module: AO -> A0 (rises with gas), DO -> 7 (LOW above the module threshold).
+// Above the limit the relay on pin 8 (e.g. a fan) and the red LED on pin 9 switch on.
+const int RELAY = 8;
+const int LED = 9;
+const int DO_PIN = 7;
+const int LIMIT = 400;
+
+void setup() {
+  pinMode(RELAY, OUTPUT);
+  pinMode(LED, OUTPUT);
+  pinMode(DO_PIN, INPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int gas = analogRead(A0);
+  bool alarm = gas > LIMIT || digitalRead(DO_PIN) == LOW;
+  digitalWrite(RELAY, alarm ? HIGH : LOW);
+  digitalWrite(LED, alarm ? HIGH : LOW);
+  Serial.print("gas AO = ");
+  Serial.print(gas);
+  Serial.println(alarm ? "  ALARM" : "");
+  delay(250);
+}
+```
+
+<a id="ex-snlm35"></a>
+
+### 传感器：LM35 温度计
+
+LM35 接 A0，用 1.1 V 内部参考电压读取，分辨率约 0.1 °C，结果输出到串口。温度由三角波信号源在 15–45 °C 之间变化。
+
+**接线**
+
+- LM35 温度传感器: +Vs → 5V, Vout → A0, GND → GND
+
+```cpp
+// LM35 thermometer: 10 mV per degree C on A0, read with the 1.1 V internal reference
+// (about 0.1 C per step, up to 110 C).
+void setup() {
+  analogReference(INTERNAL);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int raw = analogRead(A0);
+  float c = raw * 110.0 / 1024.0;
+  Serial.print("LM35: ");
+  Serial.print(c, 1);
+  Serial.println(" C");
+  delay(500);
+}
+```
+
+<a id="ex-snline"></a>
+
+### 传感器：双路循迹 (TCRT5000)
+
+两个 TCRT5000 循迹模块的 DO 接 D2 / D3，程序按“左偏 / 右偏 / 直行 / 停止”逻辑控制 D9、D11 上的两个 LED (代表左右电机)。黑线位置由方波信号源模拟。
+
+**接线**
+
+- TCRT5000 循迹模块 (L): DO → D2, VCC → 5V, GND → GND
+- TCRT5000 循迹模块 (R): DO → D3, VCC → 5V, GND → GND
+- D9 / D11 → 220 Ω → LED → GND
+
+```cpp
+// Line follower logic with two TCRT5000 modules: DO is HIGH over the black line.
+// The LEDs on 9 (left motor) and 11 (right motor) show what a robot would do.
+const int L_SENS = 2;
+const int R_SENS = 3;
+const int L_MOTOR = 9;
+const int R_MOTOR = 11;
+
+void setup() {
+  pinMode(L_SENS, INPUT);
+  pinMode(R_SENS, INPUT);
+  pinMode(L_MOTOR, OUTPUT);
+  pinMode(R_MOTOR, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  bool l = digitalRead(L_SENS) == HIGH;   // true = this sensor sees the line
+  bool r = digitalRead(R_SENS) == HIGH;
+  if (l && !r) {            // line on the left: slow the left wheel
+    digitalWrite(L_MOTOR, LOW);
+    digitalWrite(R_MOTOR, HIGH);
+    Serial.println("turn left");
+  } else if (r && !l) {
+    digitalWrite(L_MOTOR, HIGH);
+    digitalWrite(R_MOTOR, LOW);
+    Serial.println("turn right");
+  } else if (l && r) {      // both on the line: crossing / end mark
+    digitalWrite(L_MOTOR, LOW);
+    digitalWrite(R_MOTOR, LOW);
+    Serial.println("stop");
+  } else {
+    digitalWrite(L_MOTOR, HIGH);
+    digitalWrite(R_MOTOR, HIGH);
+    Serial.println("straight");
+  }
+  delay(200);
+}
+```
+
+<a id="ex-snenc"></a>
+
+### 传感器：旋转编码器计数
+
+KY-040 旋转编码器 CLK → D2、DT → D3、SW → D4：程序检测 CLK 的变化判断方向并计数，按下旋钮清零。属性里的“自动旋转速度”让它自己转动。
+
+**接线**
+
+- KY-040 旋转编码器: CLK → D2, DT → D3, SW → D4, + → 5V, GND → GND
+
+```cpp
+// KY-040 rotary encoder: count the detents (CLK = 2, DT = 3); the push button on 4 resets the count.
+const int CLK = 2;
+const int DT = 3;
+const int SW = 4;
+int count = 0;
+int lastClk;
+
+void setup() {
+  pinMode(CLK, INPUT);
+  pinMode(DT, INPUT);
+  pinMode(SW, INPUT_PULLUP);     // the module has no pull-up on SW
+  Serial.begin(9600);
+  lastClk = digitalRead(CLK);
+}
+
+void loop() {
+  int clk = digitalRead(CLK);
+  if (clk != lastClk && clk == LOW) {   // one detent = one falling edge on CLK
+    if (digitalRead(DT) != clk) count++;  // DT still HIGH: clockwise
+    else count--;
+    Serial.print("count = ");
+    Serial.println(count);
+  }
+  lastClk = clk;
+  if (digitalRead(SW) == LOW) {
+    count = 0;
+    Serial.println("reset");
+    delay(300);
+  }
+  delay(1);
+}
+```
+
+<a id="ex-snacs"></a>
+
+### 传感器：ACS712 电流监测
+
+ACS712-5A 串在 12 V 电池和 24 W 灯泡之间，OUT 接 A0；程序取 50 次平均，按 2.5 V + 0.185 V/A × I 换算电流 (约 2 A) 输出到串口。
+
+**接线**
+
+- ACS712 电流传感器: VCC → 5V, OUT → A0, GND → GND
+- 电池 12 V + → IP+, IP− → 灯泡 → 电池 −
+
+```cpp
+// ACS712-5A current monitor: OUT = 2.5 V + 0.185 V/A x I (5 V supply). Averages 50 readings.
+const float SENSITIVITY = 0.185;   // V per A (5 A version)
+const float ZERO = 2.5;            // output at 0 A
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  long sum = 0;
+  for (int i = 0; i < 50; i++) sum += analogRead(A0);
+  float v = sum / 50.0 * 5.0 / 1024.0;
+  float amps = (v - ZERO) / SENSITIVITY;
+  Serial.print("I = ");
+  Serial.print(amps, 2);
+  Serial.println(" A");
+  delay(500);
+}
+```
+
+<a id="ex-snds18"></a>
+
+### 传感器：DS18B20 数字温度计
+
+DS18B20 的 DQ 接 D4，并用 4.7 kΩ 电阻上拉到 5V；用 OneWire + DallasTemperature 库读取温度，输出到串口。温度由正弦信号源在 18–30 °C 之间变化。
+
+**接线**
+
+- DS18B20 数字温度传感器: GND → GND, DQ → D4, VDD → 5V
+- 4.7 kΩ 电阻: DQ → VDD
+
+```cpp
+// DS18B20 on pin 4 (4.7 kOhm pull-up to 5 V) with the OneWire + DallasTemperature libraries.
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+OneWire oneWire(4);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(9600);
+  sensors.begin();
+  Serial.print("devices: ");
+  Serial.println(sensors.getDeviceCount());
+}
+
+void loop() {
+  sensors.requestTemperatures();          // 12 bit: waits 750 ms for the conversion
+  float c = sensors.getTempCByIndex(0);
+  if (c == DEVICE_DISCONNECTED_C) {
+    Serial.println("sensor not found");
+  } else {
+    Serial.print("T = ");
+    Serial.print(c, 2);
+    Serial.println(" C");
+  }
+  delay(250);
+}
+```
+
+<a id="ex-snlcdi2c"></a>
+
+### 单片机：I2C 液晶屏 (LCD1602 + PCF8574)
+
+带 PCF8574 背板的 LCD1602 只需 4 根线：GND、VCC (5V)、SDA → A4、SCL → A5，地址 0x27。用 LiquidCrystal_I2C 库显示 TMP36 测得的温度和运行时间。
+
+**接线**
+
+- LCD1602 液晶屏 (I2C 背板): GND → GND, VCC → 5V, SDA → A4, SCL → A5
+- TMP36 温度传感器: +Vs → 5V, Vout → A0, GND → GND
+
+```cpp
+// LCD1602 with an I2C backpack (PCF8574, address 0x27): only 4 wires - GND, VCC, SDA = A4, SCL = A5.
+// Shows the TMP36 temperature (A0) and the uptime.
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  Wire.beginTransmission(0x27);           // is anything answering at 0x27?
+  if (Wire.endTransmission() != 0) Serial.println("no I2C device at 0x27");
+  lcd.init();
+  lcd.backlight();
+  lcd.print("TMP36 + I2C LCD");
+}
+
+void loop() {
+  float v = analogRead(A0) * 5.0 / 1024.0;
+  float c = (v - 0.5) * 100.0;           // TMP36: 0.5 V at 0 C, 10 mV per C
+  lcd.setCursor(0, 1);
+  lcd.print(c, 1);
+  lcd.print((char)223);                  // degree sign
+  lcd.print("C  ");
+  lcd.print(millis() / 1000);
+  lcd.print(" s    ");
+  delay(500);
+}
+```
 
 <a id="examples"></a>
 

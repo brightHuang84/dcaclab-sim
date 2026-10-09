@@ -433,6 +433,11 @@ const app = {
     if (isFinite(fmin)) { const T = 1 / fmin; this.acWin = T * Math.max(1, Math.ceil(0.2 / T)); } else this.acWin = 0.2;
     this.evComps = this.comps.filter(c => DEFS[c.type].event);
     this.mcuComps = this.comps.filter(c => DEFS[c.type].mcu);
+    // v11 sensors: hooks after every (sub-)step solve, parts with timed digital edges, direct MCU-pin → sensor-input links
+    this.subComps = this.comps.filter(c => DEFS[c.type].sub);
+    this.edgeComps = this.comps.filter(c => DEFS[c.type].nextEdge);
+    this._dlink = null;
+    for (const c of this.comps) { const d = DEFS[c.type]; if (!d.dins) continue; for (const i of d.dins) { const nd = c._nodes[i]; if (!(nd > 0)) continue; if (!this._dlink) this._dlink = new Map(); if (!this._dlink.has(nd)) this._dlink.set(nd, []); this._dlink.get(nd).push([c, i]); } }
     this.net = m; this.nodeCount = N; this.dirty = false;
   },
   computeWireCurrents() {
@@ -479,6 +484,13 @@ const app = {
       else if (e.owner && !e.strip && !e.inner && e.owner._m) { e.owner._m.I = e.i; e.owner._m.V = 0; e.owner._m.P = 0; }
     }
   },
+  // v11: earliest timed digital edge of a sensor after tc (splits MCU sub-steps so edges land exactly)
+  nextDEdge(tc) {
+    let e = Infinity; const L = this.edgeComps; if (!L || !L.length) return e;
+    for (const c of L) { const x = DEFS[c.type].nextEdge(c, tc + 1e-9); if (x < e) e = x; }
+    return e;
+  },
+  runSubs(m, ta, tb) { const L = this.subComps; if (L && L.length) for (const c of L) DEFS[c.type].sub(c, m, ta, tb, this); },
   simStep() {
     if (this.dirty || !this.net) this.rebuild();
     const m = this.net, t0 = this.t, h = this.dt, t = t0 + h;
@@ -504,6 +516,7 @@ const app = {
     const evc = this.evComps;
     const snap = evc.length && this.eventLoc ? m.snapshot() : null;
     let ok = m.step(t);
+    this.runSubs(m, t0, t);
     if (snap) {
       // event localisation: find the earliest switching event inside the step, rewind and split the step there
       let best = null;
@@ -532,14 +545,17 @@ const app = {
       for (const c of mc) { const rt = c.state.rt; if (rt) { rt.minsp = minsp; const x = rt.advance(tc, t1, !!m._solved || tc > t0); if (x < e) e = x; } }
       return e;
     };
-    let te = adv();
+    const nde = () => (this.edgeComps && this.edgeComps.length ? this.nextDEdge(tc) : Infinity);
+    let te = Math.min(adv(), nde());
     if (!(te < t1 - minsp)) ok = this._stepLoc(m, t0, h, t1);
     else {
       while (te < t1 - minsp && n < 256) {
         m.finalize(te - tc, 'be'); if (!m.step(te)) ok = false;
-        tc = te; n++; te = adv();
+        this.runSubs(m, tc, te);
+        tc = te; n++; te = Math.min(adv(), nde());
       }
       m.finalize(t1 - tc, 'be'); if (!m.step(t1)) ok = false;
+      this.runSubs(m, tc, t1);
       m.dt = h; m.needStamp = true;
       this.mcuSplits = (this.mcuSplits || 0) + n;
     }

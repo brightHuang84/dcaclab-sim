@@ -368,6 +368,24 @@ function toneSound(c, on, f) {
     } else if (c._osc) { c._osc.stop(); c._osc = null; BUZZERS.delete(c); }
   } catch (e) { /* audio unavailable */ }
 }
+// the 16×2 character glass of the LCD1602 parts (parallel and I2C); text(row) → 16 characters
+function lcdGlass(ctx, c, on, ct, dark, blue, text) {
+  D.upright(ctx, c, 0, 6, (ctx) => {
+    for (let r = 0; r < 2; r++) {
+      const s = on ? text(r + 1) : '                ';
+      for (let i = 0; i < 16; i++) {
+        const x = -144 + 18 * i, y = -26 + 28 * r;
+        ctx.fillStyle = blue ? 'rgba(0,0,40,' + (0.12 + 0.5 * dark) + ')' : 'rgba(20,40,0,' + (0.1 + 0.6 * dark) + ')'; ctx.fillRect(x, y, 16, 24);
+        if (on && ct > 0 && s[i] !== ' ') {
+          ctx.fillStyle = blue ? 'rgba(240,248,255,' + ct + ')' : 'rgba(10,25,0,' + ct + ')';
+          if (s[i] === '\u2588') ctx.fillRect(x + 1, y + 1, 14, 22);
+          else { ctx.font = 'bold 19px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s[i], x + 8, y + 13); }
+        }
+      }
+    }
+    if (on && ct <= 0) { ctx.fillStyle = 'rgba(255,220,120,0.9)'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚠ ' + _t('lcd1602.contrast_hint'), 0, 44); }
+  });
+}
 function drawPCB(ctx, x, y, w, h, col) { ctx.fillStyle = col || '#1f5fbf'; D.rrect(ctx, x, y, w, h, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (const [a, b] of [[x + 5, y + 5], [x + w - 5, y + 5], [x + 5, y + h - 5], [x + w - 5, y + h - 5]]) { ctx.beginPath(); ctx.arc(a, b, 2.2, 0, 7); ctx.fill(); } }
 function drawScrew(ctx, x, y) { ctx.fillStyle = '#2f7fd6'; ctx.fillRect(x - 8, y - 8, 16, 16); ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill(); ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y); ctx.stroke(); }
 const KEYS = ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'];
@@ -436,7 +454,7 @@ Object.assign(DEFS, {
     },
   },
   lcd1602: {
-    name: 'LCD1602 液晶屏', en: 'LCD1602 Character Display', cat: 'drive', desig: 'LCD',
+    name: 'LCD1602 液晶屏', en: 'LCD1602 Character Display', cat: 'drive', desig: 'LCD', keepState: ['dd', 'ddOff', 'ddOn', 'cur'],
     terms: Array.from({ length: 16 }, (_, i) => [-150 + 20 * i, -60]), termNames: ['1 VSS 地', '2 VDD +5V', '3 V0 对比度', '4 RS', '5 RW', '6 E', '7 D0', '8 D1', '9 D2', '10 D3', '11 D4', '12 D5', '13 D6', '14 D7', '15 A 背光+', '16 K 背光−'],
     box: [-180, -60, 180, 50],
     props: [{ k: 'line1', label: '第 1 行', kind: 'text', def: 'Hello, World!' }, { k: 'line2', label: '第 2 行 ({V}=VDD, {t}=时间)', kind: 'text', def: 'VDD={V}' },
@@ -456,16 +474,23 @@ Object.assign(DEFS, {
       st.blf = (st.blf || 0) + (Math.max(0, M.Ibl || 0) - (st.blf || 0)) * Math.min(1, dt / 0.02);
       if ((M.Vdd || 0) > 7) { st.burnt = true; app.dirty = true; app.toast(_t('lcd1602.lcd1602_damaged_by_excessive_supply')); }
       st.init = (M.Vdd || 0) >= 4.5 ? true : (M.Vdd || 0) < 2.7 ? false : !!st.init;
+      if (!st.init && st.dd) { st.dd = null; }                           // power loss clears the controller (needs lcd.begin() again)
+      // wired to a microcontroller (RS or E on one of its pins)? then the text only comes from the program
+      const n = c._nodes; st.mcuLinked = !!(n && (app.mcuComps || []).some((mc) => mc._nodes && (mc._nodes.includes(n[3]) || mc._nodes.includes(n[5]))));
     },
     text(c, i) {
       const st = c.state;
+      if (!st.dd && st.mcuLinked) return i === 1 ? '\u2588'.repeat(16) : ' '.repeat(16);   // v11: not initialised by the program: row 1 shows blocks like the real HD44780
       if (st.dd) { if (!st.ddOn) return ' '.repeat(16); const row = st.dd[i - 1]; let s = ''; for (let k = 0; k < 16; k++) s += row[(st.ddOff + k) % 40]; return s; }   // v10: written by a microcontroller (LiquidCrystal)
       const M = c._m; return String(c.props['line' + i] || '').replace('{V}', U.fmt(M.Vdd || 0, 'V', 3)).replace('{t}', (window.app ? app.t : 0).toFixed(2) + 's').slice(0, 16).padEnd(16, ' '); },
     contrast(c) { return U.clamp(((c._m.Vlcd || 0) - 3.0) / 1.2, 0, 1); },
     readings(c) {
       const M = c._m, st = c.state, ct = DEFS.lcd1602.contrast(c);
-      return [['VDD', U.fmt(M.Vdd || 0, 'V') + (st.init ? '' : _t('lcd1602.unpowered_undervoltage'))], [_t('lcd1602.contrast_vdd_v0'), U.fmt(M.Vlcd || 0, 'V') + (ct <= 0 ? _t('lcd1602.too_faint') : (M.Vlcd || 0) > 4.7 ? _t('lcd1602.too_dark_blocks') : _t('lcd1602.normal'))],
-        [_t('lcd1602.backlight_current'), U.fmt(Math.max(0, M.Ibl || 0), 'A')], [_t('common.display'), st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—'], [_t('common.note'), st.dd ? _t('mcu.lcd_driven') : _t('lcd1602.text_is_set_by_the_properties_as_if')]];
+      const r = [['VDD', U.fmt(M.Vdd || 0, 'V') + (st.init ? '' : _t('lcd1602.unpowered_undervoltage'))], [_t('lcd1602.contrast_vdd_v0'), U.fmt(M.Vlcd || 0, 'V') + (ct <= 0 ? _t('lcd1602.too_faint') : (M.Vlcd || 0) > 4.7 ? _t('lcd1602.dark_readable') : _t('lcd1602.normal'))],
+        [_t('lcd1602.backlight_current'), U.fmt(Math.max(0, M.Ibl || 0), 'A')], [_t('common.display'), st.init ? '"' + DEFS.lcd1602.text(c, 1).trim() + '" / "' + DEFS.lcd1602.text(c, 2).trim() + '"' : '—']];
+      if (st.init && ct <= 0) r.push([_t('common.note'), _t('lcd1602.contrast_wrong')]);
+      r.push([_t('common.note'), st.dd ? _t('mcu.lcd_driven') : st.mcuLinked ? _t('lcd1602.mcu_not_init') : _t('lcd1602.text_is_set_by_the_properties_as_if')]);
+      return r;
     },
     draw(ctx, c) {
       for (const [x, y] of DEFS.lcd1602.terms) D.lead(ctx, x, y, x, -48);
@@ -476,17 +501,9 @@ Object.assign(DEFS, {
       const bg = blue ? [20 + 30 * bl, 60 + 90 * bl, 140 + 115 * bl] : [70 + 110 * bl, 90 + 130 * bl, 20 + 20 * bl];
       ctx.fillStyle = 'rgb(' + bg.map(Math.round).join(',') + ')'; ctx.fillRect(-150, -24, 300, 60);
       if (bl > 0.05) glow(ctx, 0, 6, 120, blue ? '#6fa8ff' : '#c8f060', 0.25 * bl);
-      const ct = DEFS.lcd1602.contrast(c), on = !st.burnt && st.init, dark = on && (c._m.Vlcd || 0) > 4.7 ? U.clamp(((c._m.Vlcd || 0) - 4.7) / 0.3, 0, 1) : 0;
-      D.upright(ctx, c, 0, 6, (ctx) => {
-        for (let r = 0; r < 2; r++) {
-          const s = on ? DEFS.lcd1602.text(c, r + 1) : '                ';
-          for (let i = 0; i < 16; i++) {
-            const x = -144 + 18 * i, y = -26 + 28 * r;
-            ctx.fillStyle = blue ? 'rgba(0,0,40,' + (0.12 + 0.5 * dark) + ')' : 'rgba(20,40,0,' + (0.1 + 0.6 * dark) + ')'; ctx.fillRect(x, y, 16, 24);
-            if (on && ct > 0 && s[i] !== ' ') { ctx.fillStyle = blue ? 'rgba(240,248,255,' + ct + ')' : 'rgba(10,25,0,' + ct + ')'; ctx.font = 'bold 19px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s[i], x + 8, y + 13); }
-          }
-        }
-      });
+      // V0 near GND (VDD−V0 ≈ 5 V) is a common working wiring: boxes get a little darker but text stays readable
+      const ct = DEFS.lcd1602.contrast(c), on = !st.burnt && st.init, dark = on && (c._m.Vlcd || 0) > 4.7 ? 0.35 * U.clamp(((c._m.Vlcd || 0) - 4.7) / 0.4, 0, 1) : 0;
+      lcdGlass(ctx, c, on, ct, dark, blue, (r) => DEFS.lcd1602.text(c, r));
     },
   },
   l298n: {

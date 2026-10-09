@@ -216,4 +216,23 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .pin-win .pw-btns button:hover { filter: brightness(1.06); }
 .pin-win .pw-other { margin-top: 10px; font-weight: 600; }
 .pin-win .pw-ex.flash { animation: pwflash 1.2s ease-out; }
+.pin-win .pw-sx { border: 1px solid #d9e2f0; border-radius: 8px; padding: 2px 12px 8px; margin: 10px 0; background: #fbfcfe; }
+.pin-win .pw-sx.flash { animation: pwflash 1.2s ease-out; }
+.pin-win .pw-swire { margin: 2px 0 4px; padding-left: 20px; font: 12px/1.6 Consolas, "DejaVu Sans Mono", monospace; color: #2b3b4c; }
+.pin-win .pw-stab { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 6px; }
+.pin-win .pw-stab th { background: #eaf0f8; text-align: left; padding: 4px 6px; border-bottom: 1px solid #ccd8e6; }
+.pin-win .pw-stab td { padding: 4px 6px; border-bottom: 1px solid #e6edf2; vertical-align: top; }
+.pin-win .pw-stab .pw-spins { font: 11px/1.5 Consolas, "DejaVu Sans Mono", monospace; color: #37506a; white-space: nowrap; }
 @keyframes pwflash { from { box-shadow: 0 0 0 3px #f2b705; } to { box-shadow: 0 0 0 0 transparent; } }
+/* v11: sensors — quantity fields, description line, palette search */
+.field.qty .qrow { display: flex; align-items: center; gap: 6px; }
+.field.qty .qr { flex: 1 1 auto; min-width: 60px; }
+.field.qty .qn { width: 64px; flex: 0 0 64px; padding: 3px 5px; border: 1px solid #c9d4e0; border-radius: 5px; font: inherit; font-size: 12px; }
+.field.qty .qn.bad { border-color: #d62828; background: #fff0f0; }
+.field.qty .unit { font-size: 11px; color: #5b6b7d; min-width: 22px; }
+.pdesc { font-size: 11.5px; line-height: 1.4; color: #4a5a6c; background: #f3f7fb; border-left: 3px solid #7fb0e8; padding: 4px 7px; margin: 2px 0 8px; border-radius: 3px; }
+.btns .p-act { margin: 2px 4px 2px 0; }
+.pal-search { position: sticky; top: 0; z-index: 2; background: #f8fafc; padding: 6px 8px 4px; }
+.pal-search input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid #c9d4e0; border-radius: 6px; font: inherit; font-size: 12.5px; }
+#pal-none { padding: 6px 10px; }
+.field.qty .qr { width: auto; }

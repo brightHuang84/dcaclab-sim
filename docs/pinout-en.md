@@ -9,6 +9,7 @@
 - [Arduino Uno board](#arduino)
 - [ATtiny85 microcontroller (8-pin)](#attiny85)
 - [Common usage](#usage)
+- [Sensors](#sensors)
 - [Examples](#examples)
 
 <a id="arduino"></a>
@@ -108,10 +109,10 @@ ATtiny85 (8-pin DIP, 8-bit AVR): 5 general-purpose I/O pins PB0–PB4 plus PB5 (
 
 ## Simulator support
 
-✓ Simulated: `pinMode` / `digitalWrite` / `digitalRead` (including `INPUT_PULLUP`), `analogRead` (10-bit), `analogWrite` (PWM at the real chip's frequency), `millis` / `micros` / `delay`, `tone` / `noTone`, `pulseIn`, `shiftOut`, Servo, LiquidCrystal, `Serial` (serial monitor) and more. Pin output resistance, pull-ups and currents are part of the circuit solution, and more than 40 mA on a pin raises a warning.
+✓ Simulated: `pinMode` / `digitalWrite` / `digitalRead` (including `INPUT_PULLUP`), `analogRead` (10-bit), `analogWrite` (PWM at the real chip's frequency), `millis` / `micros` / `delay`, `tone` / `noTone`, `pulseIn`, `shiftOut`, Servo, LiquidCrystal, LiquidCrystal_I2C, DHT, OneWire + DallasTemperature, `Serial` (serial monitor) and more. Pin output resistance, pull-ups and currents are part of the circuit solution, and more than 40 mA on a pin raises a warning.
 
 - ✗ External interrupts `attachInterrupt()`: reported as unsupported when compiling — poll the pin or use `millis()` instead.
-- ✗ Pin-level timing of I²C (Wire library), the SPI library and the UART: the communication functions of D0/D1, A4/A5 and D10–D13 are not modelled; `Serial` only talks to the serial monitor.
+- ✗ The SPI library, pin-level UART timing and general I²C: the communication functions of D0/D1 and D10–D13 are not modelled, `Serial` only talks to the serial monitor; I²C on A4/A5 only supports the I2C display (LiquidCrystal_I2C, at library level), and `Wire` only supports begin / beginTransmission / write / endTransmission.
 - ✗ Timer side effects of libraries (tone disabling PWM on D3/D11, Servo disabling PWM on D9/D10) are only documented here; the simulator does not reproduce them.
 - ✗ The Uno part has no RESET, AREF, IOREF, separate SDA/SCL header or ICSP header; `analogReference(EXTERNAL)` uses VCC, `INTERNAL` = 1.1 V.
 - ✗ The ATtiny85 has no hardware UART: `Serial` in the simulator is virtual and only sends debug text to the serial monitor.
@@ -297,9 +298,11 @@ void loop() {
 
 The LCD1602 (HD44780 controller) needs only 6 signal lines in 4-bit mode: RS, E, D4–D7, with RW tied to GND (write only); the 7-argument form drives RW from a pin as well. `LiquidCrystal lcd(rs, en, d4, d5, d6, d7)`, then `lcd.begin(16, 2)`, `lcd.setCursor(col, row)`, `lcd.print()`, `lcd.clear()`.
 
-Power: VSS to GND, VDD to 5V; V0 sets the contrast, usually from the wiper of a 10 kΩ potentiometer (ends to 5V/GND) — if it is off you see solid blocks or nothing at all. A/K are the backlight LED: A to 5V through a resistor (many modules have one built in) or to a pin to switch it, K to GND.
+Power: VSS to GND, VDD to 5V; V0 sets the contrast, usually from the wiper of a 10 kΩ potentiometer (ends to 5V/GND), and is clearest at V0 ≈ 0.3–1 V. With V0 too high (for example the pot in the middle, about 2.5 V) the characters are too faint to see; V0 tied straight to GND gives dark but readable text. A/K are the backlight LED: A to 5V through a resistor (e.g. 220 Ω) or to a pin to switch it, K to GND.
 
-Short of pins? An I²C backpack (PCF8574, only A4/A5) helps on real hardware, but this simulator has no I²C, so use the parallel wiring. Rows and columns count from 0: the second line is `setCursor(0, 1)`.
+Short of pins? Use an I²C backpack (PCF8574): the part “LCD1602 Display (I2C backpack)” supports the LiquidCrystal_I2C library with SDA on A4 and SCL on A5 (PB0 / PB2 on the ATtiny85), address 0x27 or 0x3F. I²C is simulated only for this part, at library level. Rows and columns count from 0: the second line is `setCursor(0, 1)`.
+
+If the display shows nothing, check in this order: ① contrast — with the pot in the middle V0 ≈ 2.5 V and the text is too faint; turn it to V0 ≈ 0.3–1 V; ② the pin numbers in LiquidCrystal lcd(…) must match the actual wiring of RS, E and D4–D7 (a mismatch is reported naming the wrong wire); ③ setup() must call lcd.begin(16, 2); ④ VDD on 5V and VSS on the board's GND.
 
 ```cpp
 #include <LiquidCrystal.h>
@@ -316,7 +319,7 @@ void loop() {
 }
 ```
 
-*Related examples:* [MCU: LCD1602 counter (LiquidCrystal)](#ex-ardlcd)
+*Related examples:* [MCU: LCD1602 counter (LiquidCrystal)](#ex-ardlcd) · [MCU: I2C display (LCD1602 + PCF8574)](#ex-snlcdi2c)
 
 ### Serial debugging
 
@@ -368,6 +371,485 @@ void loop() {
 ```
 
 *Related examples:* [MCU: millis() multitasking (no delay)](#ex-ardmulti) · [MCU: debounced button toggles an LED (millis)](#ex-arddebounce)
+
+<a id="sensors"></a>
+
+## Sensors
+
+All sensor parts are in the “Sensors” category of the parts library. The table lists each part's pins and how a program reads it; the measured quantity can be set in the properties panel (slider + number) or driven by a signal source that changes with simulation time.
+
+| Part | Pins | How to read it |
+|---|---|---|
+| **Light Sensor Module (LDR)** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **MQ Gas Sensor Module** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Flame Sensor Module** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Soil Moisture Sensor** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Raindrop Sensor** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Thermistor Module** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Sound Sensor (envelope output)** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **TCRT5000 Line Tracking Module** | VCC · GND · DO · AO | AO → `analogRead()`; DO (LM393 comparator, threshold set by the on-board trimmer) → `digitalRead()` |
+| **Water Level Sensor** | S · + · − | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **LM35 Temperature Sensor** | +Vs · Vout · GND | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **TMP36 Temperature Sensor** | +Vs · Vout · GND | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **Flex Sensor** | 1 · 2 | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **Force Sensitive Resistor (FSR)** | 1 · 2 | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **Dual-Axis Joystick Module** | GND · +5V · VRx · VRy · SW | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **ACS712 Current Sensor** | VCC · OUT · GND · IP+ · IP− | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **Pressure Sensor (analog output)** | +5V · GND · OUT | Output voltage → `analogRead()` (0–1023 for 0–5 V) |
+| **HC-SR501 PIR Motion Sensor** | VCC · OUT · GND | Digital output → `digitalRead()` (active level: see the part description) |
+| **IR Obstacle Avoidance Module** | OUT · GND · VCC | Digital output → `digitalRead()` (active level: see the part description) |
+| **Tilt Switch (SW-520D)** | 1 · 2 | Digital output → `digitalRead()` (active level: see the part description) |
+| **SW-420 Vibration Sensor Module** | VCC · GND · DO | Digital output → `digitalRead()` (active level: see the part description) |
+| **TTP223 Touch Module** | VCC · I/O · GND | Digital output → `digitalRead()` (active level: see the part description) |
+| **KY-040 Rotary Encoder** | GND · + · SW · DT · CLK | CLK / DT → `digitalRead()` to find the direction, SW → `INPUT_PULLUP` |
+| **HC-SR04 Ultrasonic Sensor** | VCC · Trig · Echo · GND | HIGH pulse of ≥ 10 µs on Trig, `pulseIn(echo, HIGH)` measures the echo width; distance (cm) ≈ width (µs) / 58 |
+| **DHT11 / DHT22 Temperature & Humidity Sensor** | VCC · DATA · GND | `#include <DHT.h>`: `DHT dht(pin, DHT22); dht.begin();` then `dht.readTemperature()` / `dht.readHumidity()` |
+| **DS18B20 Digital Temperature Sensor** | GND · DQ · VDD | `OneWire` + `DallasTemperature`: `sensors.begin(); sensors.requestTemperatures(); sensors.getTempCByIndex(0);` (DQ needs a 4.7 kΩ pull-up) |
+| **LCD1602 Display (I2C backpack)** | GND · VCC · SDA · SCL | `LiquidCrystal_I2C lcd(0x27, 16, 2); lcd.init(); lcd.backlight();`, SDA → A4, SCL → A5 |
+
+- Modules with DO compare AO with a threshold using an LM393 comparator, and the on-board LED follows DO. The active level differs between modules (light, flame and soil modules are active LOW, the sound and SW-420 modules active HIGH) — see each part's description.
+- Signal source: the main quantity of every sensor can follow a sine, triangle, square or ramp between a minimum and a maximum with a set period, so it changes automatically while the simulation runs and you can test a program without dragging sliders.
+- Analog conversion: voltage = reading × 5 / 1023. The LM35 gives 10 mV per °C; with `analogReference(INTERNAL)` (1.1 V) the resolution is about 0.1 °C. The ACS712 outputs VCC/2 at zero current.
+- DHT, DS18B20 and the I2C display are simulated at library level: the data line must be connected to the pin named in the program, with correct power and common ground; otherwise readings are NaN / −127 or the display stays blank, and the reason is shown in a message and in the board readings.
+
+<a id="ex-snsultra"></a>
+
+### Sensor: ultrasonic distance → LCD1602
+
+The HC-SR04 measures the distance about every 100 ms (`pulseIn` measures the echo width); the distance is shown on an LCD1602 and the echo width (µs) is sent to the serial monitor. A sine signal source moves the target between 15 and 250 cm; V0 is pulled to 5V through 100 kΩ, which with the display's internal pull-down gives a contrast voltage of about 0.9 V.
+
+**Wiring**
+
+- HC-SR04 Ultrasonic Sensor: VCC → 5V, GND → GND, Trig → D7, Echo → D6
+- LCD1602 Display: RS → D3, RW → D4, E → D5, D4…D7 → D9…D12, A → D13, K / VSS → GND, VDD → 5V, V0 → 100 kΩ → VDD
+
+```cpp
+// Ultrasonic distance meter: HC-SR04 (Trig = D7, Echo = D6) shown on an LCD1602.
+// Echo pulse width in microseconds / 58 = distance in cm (sound: about 0.0343 cm/us, there and back).
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(3, 4, 5, 9, 10, 11, 12);   // RS, RW, E, D4..D7
+const int TRIG = 7;
+const int ECHO = 6;
+
+void setup() {
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);        // backlight
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  lcd.begin(16, 2);
+  lcd.print("HC-SR04 distance");
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);      // trigger pulse of 10 us
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  unsigned long us = pulseIn(ECHO, HIGH, 30000);   // 0 = no echo within 30 ms
+  lcd.setCursor(0, 1);
+  if (us == 0) {
+    lcd.print("out of range    ");
+  } else {
+    float cm = us / 58.0;
+    lcd.print(cm, 1);
+    lcd.print(" cm          ");
+  }
+  Serial.println(us);
+  delay(100);
+}
+```
+
+<a id="ex-sndht"></a>
+
+### Sensor: DHT22 temperature & humidity → serial monitor
+
+Reads the DHT22's temperature and humidity every 2 s with the DHT library, computes the heat index and prints them to the serial monitor. A sine signal source moves the temperature between 18 and 32 °C.
+
+**Wiring**
+
+- DHT11 / DHT22 Temperature & Humidity Sensor: VCC → 5V, DATA → D2, GND → GND
+
+```cpp
+// DHT22 temperature and humidity -> serial monitor every 2 s (DHT library).
+#include <DHT.h>
+
+DHT dht(2, DHT22);            // DATA on pin 2
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+}
+
+void loop() {
+  delay(2000);                // the sensor needs 2 s between readings
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  if (isnan(h) || isnan(t)) {
+    Serial.println("DHT read failed - check the wiring");
+    return;
+  }
+  Serial.print("T = ");
+  Serial.print(t, 1);
+  Serial.print(" C   RH = ");
+  Serial.print(h, 1);
+  Serial.print(" %   heat index = ");
+  Serial.print(dht.computeHeatIndex(t, h, false), 1);
+  Serial.println(" C");
+}
+```
+
+<a id="ex-snpir"></a>
+
+### Sensor: motion-activated night light (PIR + light sensor)
+
+When the HC-SR501 sees motion and the light-sensor module says it is dark, the LED on D9 lights for 10 s. Motion comes from a square-wave signal source; you can also click the PIR part.
+
+**Wiring**
+
+- HC-SR501 PIR Motion Sensor: VCC → 5V, OUT → D2, GND → GND
+- Light Sensor Module (LDR): AO → A0, VCC → 5V, GND → GND
+- D9 → 220 Ω → LED → GND
+
+```cpp
+// PIR night light: the LED on pin 9 stays on for 10 s after motion, but only when it is dark.
+const int PIR = 2;
+const int LED = 9;
+const int DARK = 600;          // AO of the light-sensor module rises in the dark
+unsigned long onUntil = 0;
+
+void setup() {
+  pinMode(PIR, INPUT);
+  pinMode(LED, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int light = analogRead(A0);
+  if (digitalRead(PIR) == HIGH && light > DARK) {
+    if (millis() >= onUntil) Serial.println("motion in the dark: light on");
+    onUntil = millis() + 10000;
+  }
+  digitalWrite(LED, millis() < onUntil ? HIGH : LOW);
+  delay(20);
+}
+```
+
+<a id="ex-snsoil"></a>
+
+### Sensor: soil moisture alarm (buzzer)
+
+Soil moisture sensor AO on A0: when the soil is too dry (high reading) the active buzzer on D8 sounds. A triangle signal source moves the moisture between 10 and 90 %.
+
+**Wiring**
+
+- Soil Moisture Sensor: AO → A0, VCC → 5V, GND → GND
+- Active Buzzer: + → D8, − → GND
+
+```cpp
+// Soil moisture alarm: beeps while the soil is too dry (AO is high when the soil is dry).
+const int BUZZER = 8;
+const int DRY = 700;
+
+void setup() {
+  pinMode(BUZZER, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int v = analogRead(A0);
+  Serial.print("soil AO = ");
+  Serial.println(v);
+  if (v > DRY) {
+    digitalWrite(BUZZER, HIGH);
+    delay(200);
+    digitalWrite(BUZZER, LOW);
+    delay(300);
+  } else {
+    digitalWrite(BUZZER, LOW);
+    delay(500);
+  }
+}
+```
+
+<a id="ex-sngas"></a>
+
+### Sensor: gas alarm (MQ-2 + relay)
+
+When the MQ-2's AO exceeds the limit or DO goes LOW, the relay on D8 (e.g. for a fan) and the red LED on D9 switch on. A sine signal source moves the gas concentration between 0 and 3000 ppm.
+
+**Wiring**
+
+- MQ Gas Sensor Module: AO → A0, DO → D7, VCC → 5V, GND → GND
+- Relay Module (1-channel): IN → D8, VCC → 5V, GND → GND
+- D9 → 220 Ω → LED → GND
+
+```cpp
+// Gas alarm with an MQ-2 module: AO -> A0 (rises with gas), DO -> 7 (LOW above the module threshold).
+// Above the limit the relay on pin 8 (e.g. a fan) and the red LED on pin 9 switch on.
+const int RELAY = 8;
+const int LED = 9;
+const int DO_PIN = 7;
+const int LIMIT = 400;
+
+void setup() {
+  pinMode(RELAY, OUTPUT);
+  pinMode(LED, OUTPUT);
+  pinMode(DO_PIN, INPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int gas = analogRead(A0);
+  bool alarm = gas > LIMIT || digitalRead(DO_PIN) == LOW;
+  digitalWrite(RELAY, alarm ? HIGH : LOW);
+  digitalWrite(LED, alarm ? HIGH : LOW);
+  Serial.print("gas AO = ");
+  Serial.print(gas);
+  Serial.println(alarm ? "  ALARM" : "");
+  delay(250);
+}
+```
+
+<a id="ex-snlm35"></a>
+
+### Sensor: LM35 thermometer
+
+LM35 on A0 read with the 1.1 V internal reference (about 0.1 °C resolution), printed to the serial monitor. A triangle signal source moves the temperature between 15 and 45 °C.
+
+**Wiring**
+
+- LM35 Temperature Sensor: +Vs → 5V, Vout → A0, GND → GND
+
+```cpp
+// LM35 thermometer: 10 mV per degree C on A0, read with the 1.1 V internal reference
+// (about 0.1 C per step, up to 110 C).
+void setup() {
+  analogReference(INTERNAL);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int raw = analogRead(A0);
+  float c = raw * 110.0 / 1024.0;
+  Serial.print("LM35: ");
+  Serial.print(c, 1);
+  Serial.println(" C");
+  delay(500);
+}
+```
+
+<a id="ex-snline"></a>
+
+### Sensor: two-channel line tracker (TCRT5000)
+
+Two TCRT5000 line-tracking modules with DO on D2 / D3; the program applies “left / right / straight / stop” logic to two LEDs on D9 and D11 (standing for the left and right motors). Square-wave signal sources simulate the line position.
+
+**Wiring**
+
+- TCRT5000 Line Tracking Module (L): DO → D2, VCC → 5V, GND → GND
+- TCRT5000 Line Tracking Module (R): DO → D3, VCC → 5V, GND → GND
+- D9 / D11 → 220 Ω → LED → GND
+
+```cpp
+// Line follower logic with two TCRT5000 modules: DO is HIGH over the black line.
+// The LEDs on 9 (left motor) and 11 (right motor) show what a robot would do.
+const int L_SENS = 2;
+const int R_SENS = 3;
+const int L_MOTOR = 9;
+const int R_MOTOR = 11;
+
+void setup() {
+  pinMode(L_SENS, INPUT);
+  pinMode(R_SENS, INPUT);
+  pinMode(L_MOTOR, OUTPUT);
+  pinMode(R_MOTOR, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  bool l = digitalRead(L_SENS) == HIGH;   // true = this sensor sees the line
+  bool r = digitalRead(R_SENS) == HIGH;
+  if (l && !r) {            // line on the left: slow the left wheel
+    digitalWrite(L_MOTOR, LOW);
+    digitalWrite(R_MOTOR, HIGH);
+    Serial.println("turn left");
+  } else if (r && !l) {
+    digitalWrite(L_MOTOR, HIGH);
+    digitalWrite(R_MOTOR, LOW);
+    Serial.println("turn right");
+  } else if (l && r) {      // both on the line: crossing / end mark
+    digitalWrite(L_MOTOR, LOW);
+    digitalWrite(R_MOTOR, LOW);
+    Serial.println("stop");
+  } else {
+    digitalWrite(L_MOTOR, HIGH);
+    digitalWrite(R_MOTOR, HIGH);
+    Serial.println("straight");
+  }
+  delay(200);
+}
+```
+
+<a id="ex-snenc"></a>
+
+### Sensor: rotary encoder counter
+
+KY-040 rotary encoder with CLK → D2, DT → D3, SW → D4: the program watches CLK changes to find the direction and count, and pressing the knob resets the count. The “auto-rotation speed” property turns it by itself.
+
+**Wiring**
+
+- KY-040 Rotary Encoder: CLK → D2, DT → D3, SW → D4, + → 5V, GND → GND
+
+```cpp
+// KY-040 rotary encoder: count the detents (CLK = 2, DT = 3); the push button on 4 resets the count.
+const int CLK = 2;
+const int DT = 3;
+const int SW = 4;
+int count = 0;
+int lastClk;
+
+void setup() {
+  pinMode(CLK, INPUT);
+  pinMode(DT, INPUT);
+  pinMode(SW, INPUT_PULLUP);     // the module has no pull-up on SW
+  Serial.begin(9600);
+  lastClk = digitalRead(CLK);
+}
+
+void loop() {
+  int clk = digitalRead(CLK);
+  if (clk != lastClk && clk == LOW) {   // one detent = one falling edge on CLK
+    if (digitalRead(DT) != clk) count++;  // DT still HIGH: clockwise
+    else count--;
+    Serial.print("count = ");
+    Serial.println(count);
+  }
+  lastClk = clk;
+  if (digitalRead(SW) == LOW) {
+    count = 0;
+    Serial.println("reset");
+    delay(300);
+  }
+  delay(1);
+}
+```
+
+<a id="ex-snacs"></a>
+
+### Sensor: ACS712 current monitor
+
+An ACS712-5A in series between a 12 V battery and a 24 W bulb, OUT on A0; the program averages 50 readings and converts them with 2.5 V + 0.185 V/A × I (about 2 A), printed to the serial monitor.
+
+**Wiring**
+
+- ACS712 Current Sensor: VCC → 5V, OUT → A0, GND → GND
+- Battery 12 V + → IP+, IP− → Bulb → Battery −
+
+```cpp
+// ACS712-5A current monitor: OUT = 2.5 V + 0.185 V/A x I (5 V supply). Averages 50 readings.
+const float SENSITIVITY = 0.185;   // V per A (5 A version)
+const float ZERO = 2.5;            // output at 0 A
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  long sum = 0;
+  for (int i = 0; i < 50; i++) sum += analogRead(A0);
+  float v = sum / 50.0 * 5.0 / 1024.0;
+  float amps = (v - ZERO) / SENSITIVITY;
+  Serial.print("I = ");
+  Serial.print(amps, 2);
+  Serial.println(" A");
+  delay(500);
+}
+```
+
+<a id="ex-snds18"></a>
+
+### Sensor: DS18B20 digital thermometer
+
+DS18B20 with DQ on D4 and a 4.7 kΩ pull-up to 5V; the OneWire + DallasTemperature libraries read the temperature and print it to the serial monitor. A sine signal source moves the temperature between 18 and 30 °C.
+
+**Wiring**
+
+- DS18B20 Digital Temperature Sensor: GND → GND, DQ → D4, VDD → 5V
+- 4.7 kΩ Resistor: DQ → VDD
+
+```cpp
+// DS18B20 on pin 4 (4.7 kOhm pull-up to 5 V) with the OneWire + DallasTemperature libraries.
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+OneWire oneWire(4);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(9600);
+  sensors.begin();
+  Serial.print("devices: ");
+  Serial.println(sensors.getDeviceCount());
+}
+
+void loop() {
+  sensors.requestTemperatures();          // 12 bit: waits 750 ms for the conversion
+  float c = sensors.getTempCByIndex(0);
+  if (c == DEVICE_DISCONNECTED_C) {
+    Serial.println("sensor not found");
+  } else {
+    Serial.print("T = ");
+    Serial.print(c, 2);
+    Serial.println(" C");
+  }
+  delay(250);
+}
+```
+
+<a id="ex-snlcdi2c"></a>
+
+### MCU: I2C display (LCD1602 + PCF8574)
+
+An LCD1602 with a PCF8574 backpack needs only 4 wires: GND, VCC (5V), SDA → A4, SCL → A5, address 0x27. The LiquidCrystal_I2C library shows the TMP36 temperature and the uptime.
+
+**Wiring**
+
+- LCD1602 Display (I2C backpack): GND → GND, VCC → 5V, SDA → A4, SCL → A5
+- TMP36 Temperature Sensor: +Vs → 5V, Vout → A0, GND → GND
+
+```cpp
+// LCD1602 with an I2C backpack (PCF8574, address 0x27): only 4 wires - GND, VCC, SDA = A4, SCL = A5.
+// Shows the TMP36 temperature (A0) and the uptime.
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  Wire.beginTransmission(0x27);           // is anything answering at 0x27?
+  if (Wire.endTransmission() != 0) Serial.println("no I2C device at 0x27");
+  lcd.init();
+  lcd.backlight();
+  lcd.print("TMP36 + I2C LCD");
+}
+
+void loop() {
+  float v = analogRead(A0) * 5.0 / 1024.0;
+  float c = (v - 0.5) * 100.0;           // TMP36: 0.5 V at 0 C, 10 mV per C
+  lcd.setCursor(0, 1);
+  lcd.print(c, 1);
+  lcd.print((char)223);                  // degree sign
+  lcd.print("C  ");
+  lcd.print(millis() / 1000);
+  lcd.print(" s    ");
+  delay(500);
+}
+```
 
 <a id="examples"></a>
 

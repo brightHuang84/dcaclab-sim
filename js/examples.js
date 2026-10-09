@@ -955,5 +955,6 @@ const EXAMPLES = (() => {
       },
     },
   ];
+  list.builder = builder;   // v11: used by the sensor examples (sensor-examples.js)
   return list;
 })();
