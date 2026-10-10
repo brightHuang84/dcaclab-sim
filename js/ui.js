@@ -280,7 +280,7 @@ Object.assign(app, {
       h += '<div class="cat" data-cat="' + cat + '"><div class="cat-t">' + title + '</div><div class="items">';
       const subs = window.CAT_SUBS && window.CAT_SUBS[cat];   // v13: sub-sections inside a category (74-series: gates / flip-flops / counters …)
       const item = ([type, d]) => '<div class="item" data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.kw || '') + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
-      if (subs) for (const sub of subs) { h += '<div class="sub-t" data-sub="' + sub + '">' + _t('ttl.sub.' + sub) + '</div>'; for (const e of Object.entries(DEFS)) if (e[1].cat === cat && e[1].pgrp === sub) h += item(e); }
+      if (subs) for (const sub of subs) { h += '<div class="sub-t" data-sub="' + sub + '">' + _t(((window.CAT_SUBKEY && window.CAT_SUBKEY[cat]) || 'ttl.sub.') + sub) + '</div>'; for (const e of Object.entries(DEFS)) if (e[1].cat === cat && e[1].pgrp === sub) h += item(e); }
       else for (const e of Object.entries(DEFS)) if (e[1].cat === cat) h += item(e);
       if (cat === 'other') h += '<div class="item" data-type="__wire" title="' + _t('h.wire_item') + ' (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>' + _t('h.wire_item') + '</span>' + (I18N.isZh() ? '<small>Wire</small>' : '') + '</div>';
       h += '</div></div>';

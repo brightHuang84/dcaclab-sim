@@ -245,3 +245,9 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .finfo { margin: 8px 0 4px; font-size: 11px; }
 .finfo summary { cursor: pointer; font-weight: 600; color: #3d6fa8; }
 .finfo pre { white-space: pre-wrap; background: #f6f8fa; border: 1px solid #e1e6ec; border-radius: 4px; padding: 5px 7px; font: 10.5px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #2b3440; max-height: 260px; overflow: auto; }
+
+/* v14: sound button */
+.grp-snd{display:flex;align-items:center;gap:4px}
+#btn-sound{min-width:34px;font-size:15px;line-height:1}
+#btn-sound.on{background:#1f6f3a;border-color:#2fbf5f;color:#fff}
+#rng-vol{width:70px;vertical-align:middle}
