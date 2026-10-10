@@ -245,11 +245,13 @@ const DEFS = {
   pot: {
     name: '电位器', en: 'Potentiometer', cat: 'basic', terms: [[-40, 0], [40, 0], [0, -40]], termNames: ['A', 'B', 'W'],
     box: [-40, -40, 40, 14],
-    props: [{ k: 'R', label: '总阻值', unit: 'Ω', def: 1000, min: 1e-3 }, { k: 'pos', label: '滑片位置', kind: 'range', def: 0.5 }],
-    label: (c) => U.fmtShort(c.props.R, 'Ω') + ' ' + Math.round(c.props.pos * 100) + '%',
+    props: [{ k: 'R', label: '总阻值', unit: 'Ω', def: 1000, min: 1e-3 }, { k: 'pos', label: '滑片位置', kind: 'range', def: 0.5 },
+      { k: 'taper', label: '阻值曲线 Taper', kind: 'select', opts: [['lin', 'B 型 线性 Linear'], ['log', 'A 型 对数 (音频) Audio']], def: 'lin', lk: 'pot.p.taper', ok: 'pot.o.taper' }],
+    label: (c) => U.fmtShort(c.props.R, 'Ω') + ' ' + Math.round(c.props.pos * 100) + '%' + (c.props.taper === 'log' ? ' A' : ''),
     wheel: true,
     build(c, n, m) {
-      const R = c.props.R, p = c.props.pos;
+      // v14: audio (A) taper — the resistance A–W follows an exponential law (≈ 9 % of R at mid travel, like a log volume pot)
+      const R = c.props.R, p = c.props.taper === 'log' ? (Math.exp(4.6 * c.props.pos) - 1) / (Math.exp(4.6) - 1) : c.props.pos;
       c._p = m.addR(n[0], n[2], 1 / Math.max(R * p, 1e-3));
       c._p2 = m.addR(n[2], n[1], 1 / Math.max(R * (1 - p), 1e-3));
     },

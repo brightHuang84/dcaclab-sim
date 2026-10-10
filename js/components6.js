@@ -360,10 +360,10 @@ function drawBuzzerBody(ctx, c, active) {
 function toneSound(c, on, f) {
   try {
     if (on) {
-      if (!AUDIO_CTX) AUDIO_CTX = new (window.AudioContext || window.webkitAudioContext)();
+      if (!AUDIO_CTX) AUDIO_CTX = AUD.ctx();
       if (c._osc) { c._osc.frequency.value = U.clamp(f, 20, 18000); return; }
       const o = AUDIO_CTX.createOscillator(), g = AUDIO_CTX.createGain();
-      o.type = 'square'; o.frequency.value = U.clamp(f, 20, 18000); g.gain.value = 0.04; o.connect(g); g.connect(AUDIO_CTX.destination); o.start();
+      o.type = 'square'; o.frequency.value = U.clamp(f, 20, 18000); g.gain.value = 0.04; o.connect(g); g.connect(AUD.master()); o.start();
       c._osc = o; BUZZERS.add(c);
     } else if (c._osc) { c._osc.stop(); c._osc = null; BUZZERS.delete(c); }
   } catch (e) { /* audio unavailable */ }

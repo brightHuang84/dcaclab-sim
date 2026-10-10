@@ -36,6 +36,10 @@
       <button id="btn-import" title="导入 JSON 文件" data-i18n-title="h.import_title">⬆ <span data-i18n="h.import">导入</span></button>
       <input type="file" id="file-in" accept=".json,application/json" hidden>
     </div>
+    <div class="grp grp-snd">
+      <button id="btn-sound" title="声音开关 (默认静音；点击后开启喇叭发声)" data-i18n-title="h.sound_title" aria-pressed="false">🔇</button>
+      <input type="range" id="rng-vol" min="0" max="100" value="60" title="音量" data-i18n-title="h.volume_title" aria-label="Volume">
+    </div>
     <div class="grp">
       <label class="lbl"><span data-i18n="h.speed">速度</span>
         <select id="sel-speed">
@@ -121,7 +125,18 @@
 <script src="js/i18n-v13/de.js"></script>
 <script src="js/i18n-v13/ru.js"></script>
 <script src="js/i18n-v13/pt-BR.js"></script>
+<script src="js/i18n-v14/zh-CN.js"></script>
+<script src="js/i18n-v14/zh-TW.js"></script>
+<script src="js/i18n-v14/en.js"></script>
+<script src="js/i18n-v14/ja.js"></script>
+<script src="js/i18n-v14/ko.js"></script>
+<script src="js/i18n-v14/es.js"></script>
+<script src="js/i18n-v14/fr.js"></script>
+<script src="js/i18n-v14/de.js"></script>
+<script src="js/i18n-v14/ru.js"></script>
+<script src="js/i18n-v14/pt-BR.js"></script>
 <script src="js/util.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/solver.js"></script>
 <script src="js/components.js"></script>
 <script src="js/components2.js"></script>
@@ -141,7 +156,10 @@
 <script src="js/examples.js"></script>
 <script src="js/sensor-examples.js"></script>
 <script src="js/board-examples.js"></script>
+<script src="js/audio-parts.js"></script>
+<script src="js/audio-amps.js"></script>
 <script src="js/ttl-examples.js"></script>
+<script src="js/audio-examples.js"></script>
 <script src="js/app.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/select.js"></script>

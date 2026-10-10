@@ -338,13 +338,16 @@ const app = {
     const ex = EXAMPLES.find(e => e.id === id) || EXAMPLES[0];
     if (typeof MCU !== 'undefined') MCU.closeEditor();
     this.load(ex.build());
+    // v14: audio examples may ask for a finer time step (the default 0.2 ms only represents audio up to ~1 kHz well); restore the user's value afterwards
+    if (ex.dt) { if (!this._userDt) this._userDt = this.dt; this.dt = ex.dt; } else if (this._userDt) { this.dt = this._userDt; this._userDt = 0; }
+    { const e = document.getElementById('set-dt'); if (e && typeof U !== 'undefined') e.value = U.fmt(this.dt, 's'); }
     this.fitView();
     this.toast(_t('app.example_loaded') + ex.name);
   },
 
   // ---------- simulation ----------
   resetSim() {
-    if (typeof stopBuzzers === 'function') stopBuzzers();
+    if (typeof AUD !== 'undefined') AUD.silence(); else if (typeof stopBuzzers === 'function') stopBuzzers();
     this.t = 0; this.hasRun = false; this.net = null; this.dirty = true; this.warn = ''; this.conv = null;
     for (const c of this.comps) { c.state = {}; c._m = {}; }
     for (const w of this.wires) { w._i = 0; w._phase = 0; }
@@ -584,7 +587,7 @@ const app = {
   },
   advance(seconds) { const n = Math.round(seconds / this.dt); for (let i = 0; i < n; i++) this.simStep(); this.computeWireCurrents(); },
   run() { this.running = true; this.updateRunBtn(); },
-  pause() { this.running = false; if (typeof stopBuzzers === 'function') stopBuzzers(); this.updateRunBtn(); },
+  pause() { this.running = false; if (typeof AUD !== 'undefined') AUD.silence(); else if (typeof stopBuzzers === 'function') stopBuzzers(); this.updateRunBtn(); },
   toggleRun() { this.running ? this.pause() : this.run(); },
 
   // ---------- Kirchhoff analysis table ----------
