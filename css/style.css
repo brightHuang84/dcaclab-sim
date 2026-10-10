@@ -239,3 +239,9 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 .pal-search input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid #c9d4e0; border-radius: 6px; font: inherit; font-size: 12.5px; }
 #pal-none { padding: 6px 10px; }
 .field.qty .qr { width: auto; }
+
+/* v13: 74-series palette sub-sections and function-table panel */
+.sub-t { grid-column: 1 / -1; font-size: 11px; font-weight: 600; color: #7a8a9c; margin: 6px 2px 0; border-bottom: 1px solid #e3e9f0; }
+.finfo { margin: 8px 0 4px; font-size: 11px; }
+.finfo summary { cursor: pointer; font-weight: 600; color: #3d6fa8; }
+.finfo pre { white-space: pre-wrap; background: #f6f8fa; border: 1px solid #e1e6ec; border-radius: 4px; padding: 5px 7px; font: 10.5px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #2b3440; max-height: 260px; overflow: auto; }

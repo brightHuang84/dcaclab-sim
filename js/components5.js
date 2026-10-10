@@ -723,6 +723,52 @@ Object.assign(DEFS, {
       ['g', 'f', '⏚', 'a', 'b'].forEach((s, i) => txt(ctx, s, -40 + 20 * i, -45, '6px sans-serif', '#9aa3ad')); ['e', 'd', '⏚', 'c', 'dp'].forEach((s, i) => txt(ctx, s, -40 + 20 * i, 45, '6px sans-serif', '#9aa3ad'));
     },
   },
+  // v13: 4-digit multiplexed 7-segment display (12-pin package as 5641AS / 3641AS: 1 E, 2 D, 3 DP, 4 C, 5 G, 6 D4, 7 B, 8 D3, 9 D2, 10 F, 11 A, 12 D1)
+  seg7x4: {
+    name: '四位数码管 (动态扫描)', en: '4-Digit 7-Segment Display (multiplexed)', cat: 'light', desig: 'DS', innerShort: true,
+    terms: Array.from({ length: 12 }, (_, i) => (i < 6 ? [-50 + 20 * i, 60] : [-50 + 20 * (11 - i), -60])),
+    termNames: ['1 e', '2 d', '3 dp', '4 c', '5 g', '6 D4', '7 b', '8 D3', '9 D2', '10 f', '11 a', '12 D1'], box: [-66, -60, 66, 60],
+    props: [{ k: 'ca', label: '共阳极 (CA)', kind: 'bool', def: false }, { k: 'color', label: '颜色', kind: 'select', opts: [['red', '红 Red'], ['green', '绿 Green'], ['blue', '蓝 Blue'], ['yellow', '黄 Yellow']], def: 'red' },
+      { k: 'Imax', label: '每段最大平均电流', unit: 'A', def: 0.03, min: 1e-4 }],
+    SEGPIN: { a: 10, b: 6, c: 3, d: 1, e: 0, f: 9, g: 4, dp: 2 }, DIGPIN: [11, 8, 7, 5],
+    label: (c) => (c.props.ca ? _t('seg7cc.ca') : _t('seg7cc.cc')),
+    vf(c) { return { red: 1.9, green: 2.1, blue: 3.0, yellow: 2.0 }[c.props.color] || 1.9; },
+    build(c, n, m) {
+      const S = DEFS.seg7x4.SEGPIN, Dg = DEFS.seg7x4.DIGPIN, Is = ledIs(DEFS.seg7x4.vf(c)), st = c.state; c._d = [[], [], [], []];
+      if (st.burnt) return;
+      for (let d = 0; d < 4; d++) for (const k of SEG_ORDER) { const p = n[S[k]], q = n[Dg[d]]; c._d[d][k] = c.props.ca ? m.addD(q, p, Is, 2 * VT, sub(st, 's' + k + d)) : m.addD(p, q, Is, 2 * VT, sub(st, 's' + k + d)); }
+      c._p = null;
+    },
+    measure(c) { c._m.V = 0; c._m.P = 0; c._m.I = 0; for (let d = 0; d < 4; d++) for (const k of SEG_ORDER) { const i = c._d[d][k] ? c._d[d][k].i : 0; c._m['I' + k + d] = i; c._m.I += Math.abs(i); } },
+    post(c, dt, app) {
+      const st = c.state; if (st.burnt) return; let mx = 0;
+      for (let d = 0; d < 4; d++) for (const k of SEG_ORDER) mx = Math.max(mx, ledAvg(st, 'b' + k + d, c._m['I' + k + d], dt));
+      if (mx > c.props.Imax) { st.over = (st.over || 0) + dt; if (st.over > 0.05) { st.burnt = true; app.dirty = true; app.toast(_t('seg7cc.display_segment_burnt_out_by_excessi')); } } else st.over = 0;
+    },
+    lit(c, d) { const st = c.state; let b = 0; SEG_ORDER.forEach((k, i) => { if ((st['b' + k + d] || 0) > 1e-3) b |= 1 << i; }); return b; },
+    text(c) { const SEG = [0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f]; let o = ''; for (let d = 0; d < 4; d++) { const v = DEFS.seg7x4.lit(c, d) & 0x7f, i = SEG.indexOf(v); o += v === 0 ? '_' : i >= 0 ? String(i) : '?'; } return o; },
+    readings(c) { return [[_t('common.display'), DEFS.seg7x4.text(c)]]; },
+    draw(ctx, c) {
+      for (const [x, y] of DEFS.seg7x4.terms) D.lead(ctx, x, y, x, y * 0.8);
+      ctx.fillStyle = '#1a1c20'; D.rrect(ctx, -64, -48, 128, 96, 4); ctx.fill(); ctx.fillStyle = '#26292e'; D.rrect(ctx, -60, -43, 120, 86, 3); ctx.fill();
+      const col = { red: '#ff2a1f', green: '#2bff4a', blue: '#3b8bff', yellow: '#ffd21f' }[c.props.color] || '#ff2a1f', st = c.state;
+      D.upright(ctx, c, 0, 0, (ctx) => {
+        const W = 17, H = 20, t = 4, sk = 0.1, seg = { a: [-W / 2, -H, W, 0], b: [W / 2, -H, 0, H], c: [W / 2, 0, 0, H], d: [-W / 2, H, W, 0], e: [-W / 2, 0, 0, H], f: [-W / 2, -H, 0, H], g: [-W / 2, 0, W, 0] };
+        for (let d = 0; d < 4; d++) {
+          ctx.save(); ctx.translate(-45 + 30 * d, 0);
+          for (const k of SEG_ORDER.slice(0, 7)) {
+            const [x, y, dx, dy] = seg[k], b = st.burnt ? 0 : U.clamp((st['b' + k + d] || 0) / 0.01, 0, 1);
+            ctx.strokeStyle = b > 0.03 ? U.rgba(col, 0.35 + 0.65 * b) : 'rgba(255,255,255,0.07)'; ctx.lineWidth = t; ctx.lineCap = 'round';
+            if (b > 0.03) { ctx.shadowColor = col; ctx.shadowBlur = 8 * b; }
+            const X = (xx, yy) => xx - yy * sk; ctx.beginPath(); ctx.moveTo(X(x + (dx ? 3 : 0), y + (dy ? 3 : 0)), y + (dy ? 3 : 0)); ctx.lineTo(X(x + dx - (dx ? 3 : 0), y + dy - (dy ? 3 : 0)), y + dy - (dy ? 3 : 0)); ctx.stroke(); ctx.shadowBlur = 0;
+          }
+          const bd = st.burnt ? 0 : U.clamp((st['bdp' + d] || 0) / 0.01, 0, 1); ctx.fillStyle = bd > 0.03 ? col : 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(W / 2 + 5, H, 2.2, 0, 7); ctx.fill();
+          ctx.restore();
+        }
+      });
+      ['e', 'd', 'dp', 'c', 'g', 'D4'].forEach((q, i) => txt(ctx, q, -50 + 20 * i, 45, '6px sans-serif', '#9aa3ad')); ['D1', 'a', 'f', 'D2', 'D3', 'b'].forEach((q, i) => txt(ctx, q, -50 + 20 * i, -45, '6px sans-serif', '#9aa3ad'));
+    },
+  },
   ledbar: {
     name: 'LED 光柱 (10 段)', en: 'LED Bar Graph ×10', cat: 'light', desig: 'DS',
     terms: Array.from({ length: 10 }, (_, i) => [-100 + 20 * i, -40]).concat(Array.from({ length: 10 }, (_, i) => [-100 + 20 * i, 40])),

@@ -102,7 +102,10 @@ const MCU = (() => {
     // return the time of the next pending pin event (> tc + minsp) or Infinity
     advance(tc, t1, solved) {
       this.tnow = tc;
-      this.fireAt(tc);
+      const nfire = this.fireAt(tc);
+      // v13: pin changes were just applied: when the circuit contains 74-series logic let it react (a solve step of one minimum sub-step)
+      // before the program continues, so that e.g. digitalRead() right after raising a shift-register clock already sees the new output
+      if (nfire && this.gen && !this.err && this.digNet()) return Math.min(this.nextT(), tc + 1.5 * this.minsp);
       if (this.gen && !this.err && solved && !this.pn && this.tp < t1) {
         if (this.tp < tc - 0.05) this.tp = tc;
         // v11: stop at the next timed sensor edge (e.g. HC-SR04 ECHO) so inputs are read at the exact simulated time
@@ -120,9 +123,10 @@ const MCU = (() => {
     // schedule an electrical change at the current program time
     at(fn) {
       const t = this.tp;
-      if (t <= this.tnow + this.minsp && !this.pend.length) fn(this.tnow);
+      if (t <= this.tnow + this.minsp && !this.pend.length && !this.digNet()) fn(this.tnow);
       else { this.pend.push({ t, fn }); this.pn = this.pend.length; }
     }
+    digNet() { const n = this.app.net; return !!(n && n.dig && n.dig.parts.length); }   // v13: the circuit contains 74-series logic
     fireAt(t) {
       const lim = t + this.minsp;
       let k = 0;
@@ -134,6 +138,7 @@ const MCU = (() => {
         while (ch.tNext <= lim && guard++ < 64) ch.step(ch.tNext);
       }
       this.sync(t);
+      return k;
     }
     // ---- electrical side
     driveOf(p) {
