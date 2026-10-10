@@ -505,7 +505,13 @@ class MNA {
   // If Newton fails, the step is retried automatically: (1) cut the time step (down to SIMOPT.minStep, Backward
   // Euler restart), (2) gmin stepping and source stepping at the hard time point; only if all of these fail is
   // the best-effort solution kept and converged = false reported.
+  // v13: digital (74-series) parts settle inside the step (delta cycles) and commit their state once the step is accepted
   step(t) {
+    const ok = this._step0(t);
+    if (this.dig) this.dig.commit(this, t);
+    return ok;
+  }
+  _step0(t) {
     if (this._nest || this.nl.length === 0) return this._stepOnce(t, false);
     this.iters = 0;
     const s0 = this.snapshot(), h = this.dt, meth = this.method, beSteps = this.beSteps, need = this.needStamp;
@@ -543,7 +549,25 @@ class MNA {
     this.restore(s);
     return this._cutStep(t0, h / 2, depth + 1) && this._cutStep(t0 + h / 2, h / 2, depth + 1);
   }
+  // v13: digital settling. After a solve every digital part re-evaluates its logic from the node voltages; when an output
+  // drive changed, the step is rewound and solved again (zero-delay propagation through chains of gates), up to dig.maxIter passes.
   _stepOnce(t, homo) {
+    const D = this.dig;
+    if (!D || this._inDig) return this._stepOnce0(t, homo);
+    const snap = this.snapshot();
+    this._inDig = true;
+    try {
+      let ok = true;
+      for (let it = 0; ; it++) {
+        ok = this._stepOnce0(t, homo);
+        if (!D.eval(this, t)) break;
+        if (it >= D.maxIter) { D.unsettled++; D.lastUnsettled = t; break; }
+        this.restore(snap); this.needStamp = true; D.passes++;
+      }
+      return ok;
+    } finally { this._inDig = false; }
+  }
+  _stepOnce0(t, homo) {
     SIMCLK.t = t;
     const snap = this.hasAcc && !this._redo ? this.snapshot() : null;
     if (this.needStamp) this.finalize(this.dt, 'be');
@@ -601,12 +625,14 @@ class MNA {
   // state snapshot / restore (event localisation)
   snapshot() {
     const s = { x: this.x ? Float64Array.from(this.x) : null, method: this.method, beSteps: this.beSteps, dt: this.dt, st: [] };
+    if (this.dig) s.dig = this.dig.snap();
     for (const p of this.prims) if (p.st) s.st.push([p.st, Object.assign({}, p.st)]);
     return s;
   }
   restore(s) {
     for (const [st, copy] of s.st) Object.assign(st, copy);
     if (s.x) this.x = Float64Array.from(s.x);
+    if (s.dig && this.dig) this.dig.restore(s.dig);
   }
 }
 MNA.forceDense = false; MNA.forceSparse = false;

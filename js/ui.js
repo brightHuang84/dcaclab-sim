@@ -33,10 +33,12 @@ Object.assign(app, {
     for (const a of d.acts || []) extra.push('<button class="p-act primary" data-a="' + a.k + '">' + a.label + '</button>');
     h += '<div class="btns">' + extra.join('') + _t('ui.rotate_r_duplicate_delete');
     h += '<div id="readings" class="readings"></div>';
+    if (d.info) h += '<details class="finfo"' + (this._finfoOpen ? ' open' : '') + '><summary>' + _t('ttl.func_table') + '</summary><pre>' + String(d.info(c)).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre></details>';
     if (d.termNames) h += _t('ui.terminals') + d.termNames.join(' / ') + '</div>';
     if (d.board) h += _t('ui.each_column_a_e_and_f_j_has_five_con');
     el.innerHTML = h;
     this.drawThumb(el.querySelector('.picon'), c.type, c);
+    const fi = el.querySelector('.finfo'); if (fi) fi.ontoggle = () => { this._finfoOpen = fi.open; };
     el.querySelectorAll('input.tprop').forEach(inp => { inp.onchange = () => { c.props[inp.dataset.k] = inp.value.slice(0, 40); this.dirty = true; this.changed(); }; inp.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); }; });
     this.bindQty(el, d, [c]);
     el.querySelectorAll('.p-act').forEach(b => b.onclick = () => { d.act(c, b.dataset.a, this); this.dirty = true; this.updateReadings(true); });
@@ -276,7 +278,10 @@ Object.assign(app, {
     let h = '<div class="pal-search"><input type="search" id="pal-q" autocomplete="off" placeholder="' + esc(_t('h.search_parts')) + '" value="' + esc(this.palQ || '') + '"></div><div id="pal-none" class="hint" hidden>' + _t('h.search_none') + '</div>';
     for (const [cat, title] of CATEGORIES) {
       h += '<div class="cat" data-cat="' + cat + '"><div class="cat-t">' + title + '</div><div class="items">';
-      for (const [type, d] of Object.entries(DEFS)) if (d.cat === cat) h += '<div class="item" data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
+      const subs = window.CAT_SUBS && window.CAT_SUBS[cat];   // v13: sub-sections inside a category (74-series: gates / flip-flops / counters …)
+      const item = ([type, d]) => '<div class="item" data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.kw || '') + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
+      if (subs) for (const sub of subs) { h += '<div class="sub-t" data-sub="' + sub + '">' + _t('ttl.sub.' + sub) + '</div>'; for (const e of Object.entries(DEFS)) if (e[1].cat === cat && e[1].pgrp === sub) h += item(e); }
+      else for (const e of Object.entries(DEFS)) if (e[1].cat === cat) h += item(e);
       if (cat === 'other') h += '<div class="item" data-type="__wire" title="' + _t('h.wire_item') + ' (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>' + _t('h.wire_item') + '</span>' + (I18N.isZh() ? '<small>Wire</small>' : '') + '</div>';
       h += '</div></div>';
     }
@@ -302,6 +307,7 @@ Object.assign(app, {
     document.querySelectorAll('#palette-body .cat').forEach(cat => {
       let n = 0;
       cat.querySelectorAll('.item').forEach(it => { const s = it.dataset.s || (it.dataset.type === '__wire' ? 'wire ' + _t('h.wire_item').toLowerCase() : ''); const ok = words.every(w => s.includes(w)); it.hidden = !ok; if (ok) n++; });
+      cat.querySelectorAll('.sub-t').forEach(st => { let e = st.nextElementSibling, any2 = false; while (e && e.classList.contains('item')) { if (!e.hidden) any2 = true; e = e.nextElementSibling; } st.hidden = !any2; });
       cat.hidden = !n; if (n) any = true;
     });
     const none = $('#pal-none'); if (none) none.hidden = any;
