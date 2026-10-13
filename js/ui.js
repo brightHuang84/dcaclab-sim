@@ -275,17 +275,27 @@ Object.assign(app, {
   buildPalette() {
     const pal = $('#palette-body');
     const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    let h = '<div class="pal-search"><input type="search" id="pal-q" autocomplete="off" placeholder="' + esc(_t('h.search_parts')) + '" value="' + esc(this.palQ || '') + '"></div><div id="pal-none" class="hint" hidden>' + _t('h.search_none') + '</div>';
+    let h = '<div class="pal-search"><input type="search" id="pal-q" autocomplete="off" placeholder="' + esc(_t('h.search_parts')) + '" value="' + esc(this.palQ || '') + '"><div class="pal-all"><button type="button" id="pal-exp-all">' + esc(_t('h.pal_expand_all')) + '</button><button type="button" id="pal-col-all">' + esc(_t('h.pal_collapse_all')) + '</button></div></div><div id="pal-none" class="hint" hidden>' + _t('h.search_none') + '</div>';
     for (const [cat, title] of CATEGORIES) {
-      h += '<div class="cat" data-cat="' + cat + '"><div class="cat-t">' + title + '</div><div class="items">';
+      // v14.1: collapsible category header (button semantics, remembered per category)
+      const op = !!this.palOpen()[cat];
+      h += '<div class="cat' + (op ? ' open' : '') + '" data-cat="' + cat + '"><div class="cat-t" role="button" tabindex="0" aria-expanded="' + op + '" data-key="' + cat + '"><span class="chev" aria-hidden="true">▸</span>' + title + '</div><div class="cat-body"><div class="items">';
       const subs = window.CAT_SUBS && window.CAT_SUBS[cat];   // v13: sub-sections inside a category (74-series: gates / flip-flops / counters …)
-      const item = ([type, d]) => '<div class="item" data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.kw || '') + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
-      if (subs) for (const sub of subs) { h += '<div class="sub-t" data-sub="' + sub + '">' + _t(((window.CAT_SUBKEY && window.CAT_SUBKEY[cat]) || 'ttl.sub.') + sub) + '</div>'; for (const e of Object.entries(DEFS)) if (e[1].cat === cat && e[1].pgrp === sub) h += item(e); }
+      let curSub = null;
+      const item = ([type, d]) => '<div class="item' + (curSub && !this.palOpen()[cat + '/' + curSub] ? ' subhid' : '') + '"' + (curSub ? ' data-g="' + cat + '/' + curSub + '"' : '') + ' data-type="' + type + '" data-s="' + esc((d.name + ' ' + d.en + ' ' + type + ' ' + (d.kw || '') + ' ' + (d.desc || '') + ' ' + title).toLowerCase()) + '" title="' + esc(d.name + (I18N.isZh() ? ' ' + d.en : '') + (d.desc ? '\n' + d.desc : '')) + '"><canvas width="64" height="44"></canvas><span>' + d.name + '</span>' + (I18N.isZh() ? '<small>' + d.en + '</small>' : '') + '</div>';
+      if (subs) for (const sub of subs) { curSub = sub; const so = !!this.palOpen()[cat + '/' + sub]; h += '<div class="sub-t" role="button" tabindex="0" aria-expanded="' + so + '" data-key="' + cat + '/' + sub + '" data-sub="' + sub + '"><span class="chev" aria-hidden="true">▸</span>' + _t(((window.CAT_SUBKEY && window.CAT_SUBKEY[cat]) || 'ttl.sub.') + sub) + '</div>'; for (const e of Object.entries(DEFS)) if (e[1].cat === cat && e[1].pgrp === sub) h += item(e); }
       else for (const e of Object.entries(DEFS)) if (e[1].cat === cat) h += item(e);
       if (cat === 'other') h += '<div class="item" data-type="__wire" title="' + _t('h.wire_item') + ' (W)"><canvas width="64" height="44" id="wire-thumb"></canvas><span>' + _t('h.wire_item') + '</span>' + (I18N.isZh() ? '<small>Wire</small>' : '') + '</div>';
-      h += '</div></div>';
+      h += '</div></div></div>';
     }
     pal.innerHTML = h;
+    pal.querySelectorAll('.cat-t, .sub-t').forEach((hd) => {
+      const go = () => this.setPalOpen(hd.dataset.key, !(hd.getAttribute('aria-expanded') === 'true'));
+      hd.onclick = go;
+      hd.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); go(); } };
+    });
+    $('#pal-exp-all').onclick = () => this.setPalAll(true);
+    $('#pal-col-all').onclick = () => this.setPalAll(false);
     pal.querySelectorAll('.item').forEach(it => {
       const type = it.dataset.type, cv = it.querySelector('canvas');
       if (type === '__wire') {
@@ -300,6 +310,41 @@ Object.assign(app, {
     const q = $('#pal-q');
     if (q) { q.oninput = () => this.filterPalette(q.value); q.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Escape') { q.value = ''; this.filterPalette(''); } }; this.filterPalette(q.value); }
   },
+  // v14.1: expand / collapse state of the library, remembered in localStorage (default: everything collapsed)
+  palOpen() {
+    if (!this._palOpen) { try { this._palOpen = JSON.parse(localStorage.getItem('dcl.palOpen') || '{}') || {}; } catch (e) { this._palOpen = {}; } }
+    return this._palOpen;
+  },
+  savePalOpen() { try { localStorage.setItem('dcl.palOpen', JSON.stringify(this._palOpen || {})); } catch (e) { } },
+  setPalOpen(key, on, noSave) {
+    const st = this.palOpen(); if (on) st[key] = true; else delete st[key];
+    const hd = document.querySelector('#palette-body [data-key="' + key + '"]'); if (!hd) return;
+    hd.setAttribute('aria-expanded', String(on));
+    if (hd.classList.contains('cat-t')) hd.parentElement.classList.toggle('open', on);
+    else document.querySelectorAll('#palette-body .item[data-g="' + key + '"]').forEach((it) => it.classList.toggle('subhid', !on));
+    if (!noSave) this.savePalOpen();
+  },
+  setPalAll(on) { document.querySelectorAll('#palette-body [data-key]').forEach((hd) => this.setPalOpen(hd.dataset.key, on, true)); this.savePalOpen(); },
+  // v14.1: the whole side panels collapse to a thin strip (remembered); the canvas is resized
+  setPanelMin(which, on, noSave) {
+    const app = document.getElementById('app'); if (!app) return;
+    app.classList.toggle(which + '-min', on);
+    const b = document.getElementById(which + '-toggle');
+    if (b) { const k = which === 'pal' ? (on ? 'h.pal_show' : 'h.pal_hide') : (on ? 'h.props_show' : 'h.props_hide'); b.textContent = (which === 'pal') === on ? '»' : '«'; b.title = _t(k); b.setAttribute('aria-label', _t(k)); b.setAttribute('aria-expanded', String(!on)); }
+    if (!noSave) try { localStorage.setItem('dcl.' + which + 'Min', on ? '1' : ''); } catch (e) { }
+    this.resize(); this.dirty = true;
+    clearTimeout(this._panT); this._panT = setTimeout(() => { this.resize(); this.dirty = true; }, 200);   // after the width transition
+  },
+  initPanels() {
+    for (const w of ['pal', 'props']) {
+      const host = document.getElementById(w === 'pal' ? 'palette' : 'props'); if (!host || document.getElementById(w + '-toggle')) continue;
+      const b = document.createElement('button'); b.type = 'button'; b.id = w + '-toggle'; b.className = 'panel-toggle';
+      b.onclick = () => this.setPanelMin(w, !document.getElementById('app').classList.contains(w + '-min'));
+      if (w === 'pal') (host.querySelector('.side-t') || host).appendChild(b); else host.insertBefore(b, host.firstChild);
+      let on = false; try { on = !!localStorage.getItem('dcl.' + w + 'Min'); } catch (e) { }
+      this.setPanelMin(w, on, true);
+    }
+  },
   // v11: palette search (name in the UI language, English name, type id, description, category)
   filterPalette(q) {
     this.palQ = q; const words = String(q || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -311,6 +356,8 @@ Object.assign(app, {
       cat.hidden = !n; if (n) any = true;
     });
     const none = $('#pal-none'); if (none) none.hidden = any;
+    // v14.1: while searching, matching categories / sub-groups are shown expanded (temporarily, the saved state is untouched)
+    const pb = $('#palette-body'); if (pb) pb.classList.toggle('searching', words.length > 0);
   },
   setWireMode(on) {
     this.wireMode = on;
@@ -709,7 +756,7 @@ Object.assign(app, {
     this.cv = $('#cv'); this.ctx = this.cv.getContext('2d');
     this.resize();
     window.addEventListener('resize', () => this.resize());
-    this.buildPalette(); this.bindToolbar(); this.bindCanvas();
+    this.buildPalette(); this.bindToolbar(); this.bindCanvas(); this.initPanels();
     const q = new URLSearchParams(location.search);
     let loaded = false;
     if (q.get('example')) { this.loadExample(q.get('example')); loaded = true; }
