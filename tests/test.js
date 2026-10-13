@@ -51,6 +51,8 @@ const BASE = process.env.BASE || 'http://127.0.0.1:8765/index.html';
   // 2. Build battery+switch+bulb circuit via real mouse interactions
   await page.evaluate(() => { app.pause(); app.clearAll(); app.view = { s: 1, ox: 0, oy: 0 }; });
   const box = await page.locator('#cv').boundingBox();
+  await page.evaluate(() => app.setPalAll && app.setPalAll(true));   // v14.1: the library starts collapsed — expand it for the drag tests
+  await page.waitForTimeout(250);
   const drop = async (type, x, y) => {
     const it = page.locator(`.item[data-type="${type}"]`); await it.scrollIntoViewIfNeeded(); const ib = await it.boundingBox();
     await page.mouse.move(ib.x + ib.width / 2, ib.y + ib.height / 2); await page.mouse.down();
