@@ -32,6 +32,7 @@ Object.assign(app, {
     if (c.type === 'capacitor') extra.push(_t('ui.discharge'));
     for (const a of d.acts || []) extra.push('<button class="p-act primary" data-a="' + a.k + '">' + a.label + '</button>');
     h += '<div class="btns">' + extra.join('') + _t('ui.rotate_r_duplicate_delete');
+    if (typeof REAL !== 'undefined') h += REAL.propsHtml(c);   // v15: nominal → actual values etc. (only in real-world mode)
     h += '<div id="readings" class="readings"></div>';
     if (d.info) h += '<details class="finfo"' + (this._finfoOpen ? ' open' : '') + '><summary>' + _t('ttl.func_table') + '</summary><pre>' + String(d.info(c)).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre></details>';
     if (d.termNames) h += _t('ui.terminals') + d.termNames.join(' / ') + '</div>';
