@@ -280,3 +280,18 @@ html:lang(ru) .item span { font-size: 10px; letter-spacing: -.25px; }
 #app.pal-min .side-t { border: 0; padding: 0; height: 40px; }
 #app.pal-min #palette, #app.props-min #props { overflow: hidden; padding: 0; }
 #app.pal-min #pal-toggle, #app.props-min #props-toggle { left: 2px; right: auto; }
+
+/* v15: real-world simulation */
+#btn-real.on { background: #ffd84a !important; color: #3a2c00 !important; font-weight: 700; }
+#real-pop { position: fixed; z-index: 50; width: 260px; background: #fff; border: 1px solid #b9c7d8; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); padding: 10px 12px; font-size: 12.5px; color: #243142; }
+#real-pop[hidden] { display: none; }
+.real-pt { font-weight: 700; color: #1b5fb8; margin-bottom: 6px; }
+.real-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 5px 0; }
+.real-row input[type=number] { width: 70px; }
+.real-fx { display: grid; grid-template-columns: 1fr; gap: 2px; margin: 6px 0; padding: 6px 0; border-top: 1px solid #e3e9f0; border-bottom: 1px solid #e3e9f0; }
+#real-reroll { width: 100%; margin-top: 4px; padding: 4px; border: 1px solid #cfd8e3; border-radius: 5px; background: #f5f8fc; cursor: pointer; }
+.real-box { margin: 8px 0; padding: 6px 8px; background: #fffbea; border: 1px solid #f2d675; border-radius: 6px; font-size: 12px; }
+.real-box .real-t { font-weight: 700; color: #8a6d00; margin-bottom: 3px; }
+.real-box > div:not(.real-t) { display: flex; justify-content: space-between; gap: 6px; }
+.real-box .rk { white-space: nowrap; color: #6b5a1a; }
+#real-pop label.real-row:first-of-type { justify-content: flex-start; }

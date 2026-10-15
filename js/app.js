@@ -360,7 +360,9 @@ const app = {
     const wpts = this.wires.map(w => { const a = w.pts[0], b = w.pts[w.pts.length - 1]; return [pid(a[0], a[1]), pid(b[0], b[1])]; });
     // ideal connections (merged into super-nodes): wires, closed switches, breadboard strips
     const edges = [];
-    this.wires.forEach((w, k) => edges.push({ a: wpts[k][0], b: wpts[k][1], owner: w, i: 0 }));
+    // v15 real-world mode: wires get a small resistance instead of being ideal (they become resistors in _buildMNA)
+    const wireR = typeof REAL !== 'undefined' && REAL.fx('wire') ? REAL.wireR : null;
+    if (!wireR) this.wires.forEach((w, k) => edges.push({ a: wpts[k][0], b: wpts[k][1], owner: w, i: 0 }));
     comps.forEach((c, k) => {
       const d = DEFS[c.type];
       if (d.shorted) { const pr = d.shorted(c); if (pr) for (const [i, j] of pr) edges.push({ a: cpts[k][i], b: cpts[k][j], owner: c, i: 0, inner: !!d.innerShort }); }
@@ -379,7 +381,7 @@ const app = {
     const rootNode = new Map(); let N = 0;
     const pointNode = new Int32Array(np);
     for (let i = 0; i < np; i++) { const r = find(i); if (gndRoots.has(r)) { pointNode[i] = 0; continue; } if (!rootNode.has(r)) rootNode.set(r, ++N); pointNode[i] = rootNode.get(r); }
-    return { idx, P, cpts, wpts, edges, find, gndPts, pointNode, N };
+    return { idx, P, cpts, wpts, edges, find, gndPts, pointNode, N, wireR };
   },
   // stamp every component into a new MNA (not finalized); floating islands get a reference
   _buildMNA(comps, T) {
@@ -393,6 +395,11 @@ const app = {
       DEFS[c.type].build(c, c._nodes, m);
     });
     m.tp = null;
+    for (const w of this.wires) w._rp = null;
+    if (T.wireR) this.wires.forEach((w, k) => {
+      const pa = T.wpts[k][0], pb = T.wpts[k][1], a = T.pointNode[pa], b = T.pointNode[pb]; if (a === b) return;
+      w._rp = m._add({ t: 'R', a, b, g: 1 / T.wireR(w), i: 0 }); w._rp.pa = pa; w._rp.pb = pb;
+    });
     const NN = m.N, ip = Array.from({ length: NN + 1 }, (_, i) => i);
     const f2 = (i) => { while (ip[i] !== i) { ip[i] = ip[ip[i]]; i = ip[i]; } return i; };
     const un = (a, b) => { a = f2(a); b = f2(b); if (a !== b) ip[a] = b; };
@@ -464,6 +471,7 @@ const app = {
       }
     }
     for (const e of this.edges) if (e.a === e.b && e.owner && e.owner.pts) e.owner._i = 0;
+    for (const w of this.wires) if (w._rp) w._i = w._rp.i;
   },
   // BFS spanning tree of an ideal-conductor group; loop (chord) edges carry no current
   treeGroup(ref, pts, edges) {
