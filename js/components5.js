@@ -112,7 +112,9 @@ NLACCEPT.thyr = function (p, Vf) {
 // ---------------- part-number presets ----------------
 const PRESETS = {
   diode: { '1N4148': { Is: 2.52e-9, nf: 1.752, Rs: 0.568 }, '1N4007': { Is: 7.03e-9, nf: 1.808, Rs: 0.034 }, '1N5819': { Is: 3.17e-5, nf: 1.373, Rs: 0.051 }, '1N5408': { Is: 1.4e-8, nf: 1.9, Rs: 0.012 } },
-  npn: { '2N2222': { BF: 200, Is: 1.4e-14, VAF: 74 }, 'S8050': { BF: 160, Is: 2e-14, VAF: 100 }, 'BC547': { BF: 290, Is: 1.8e-14, VAF: 63 }, '2N3904': { BF: 300, Is: 6.7e-15, VAF: 74 } },
+  npn: { '2N2222': { BF: 200, Is: 1.4e-14, VAF: 74 }, 'S8050': { BF: 160, Is: 2e-14, VAF: 100 }, 'BC547': { BF: 290, Is: 1.8e-14, VAF: 63 }, '2N3904': { BF: 300, Is: 6.7e-15, VAF: 74 },
+    // v15.2: high-voltage switching NPNs (Chinese "13001/13003/13005"), low β, rated Vceo / Ic max
+    'MJE13001': { BF: 25, Is: 5e-14, VAF: 200, Vceo: 400, Icmax: 0.2 }, 'MJE13003': { BF: 20, Is: 2e-13, VAF: 200, Vceo: 400, Icmax: 1.5 }, 'MJE13005': { BF: 15, Is: 5e-13, VAF: 200, Vceo: 400, Icmax: 4 } },
   pnp: { '2N2907': { BF: 200, Is: 6.5e-14, VAF: 115 }, 'S8550': { BF: 160, Is: 2e-14, VAF: 100 }, 'BC557': { BF: 250, Is: 1e-14, VAF: 80 }, '2N3906': { BF: 180, Is: 1.4e-14, VAF: 18.7 } },
   nmos: { '2N7000': { Vth: 2.1, K: 0.035 }, 'IRF540': { Vth: 3.0, K: 1.6 }, 'IRLZ44N': { Vth: 1.5, K: 6.5 }, 'AO3400': { Vth: 1.0, K: 8 } },
   pmos: { 'IRF9540': { Vth: 3.0, K: 1.0 }, 'AO3401': { Vth: 0.9, K: 5 } },
@@ -135,6 +137,21 @@ DEFS.diode.build = function (c, n, m) {
   if (P.Rs > 0) { const x = m.newNode(); c._p = m.addD(n[0], x, P.Is, P.nf * VT, c.state); m.addR(x, n[1], 1 / P.Rs); }
   else c._p = m.addD(n[0], n[1], P.Is, P.nf * VT, c.state);
 };
+// v15.2: BJT ratings (0 = no limit) -> warnings when V_CE exceeds V_CEO (breakdown) or I_C exceeds I_C max (overload)
+for (const t of ['npn', 'pnp']) {
+  const d = DEFS[t];
+  d.props.push({ k: 'Vceo', label: '耐压 Vceo (0=不限)', unit: 'V', def: 0, min: 0 }, { k: 'Icmax', label: '最大集电极电流 Ic max (0=不限)', unit: 'A', def: 0, min: 0 });
+  const oldPost = d.post;
+  d.post = function (c, dt, app) {
+    if (oldPost) oldPost.call(this, c, dt, app);
+    const P = c.props, m = c._m || {}, st = c.state, s = t === 'pnp' ? -1 : 1;
+    const ov = P.Vceo > 0 && s * (m.V || 0) > P.Vceo, oi = P.Icmax > 0 && s * (m.I || 0) > P.Icmax;
+    if (ov && !st.ovV) app.toast(_t('bjt.breakdown', { p: d.label(c), v: U.fmt(P.Vceo, 'V') }));
+    if (oi && !st.ovI) app.toast(_t('bjt.overload', { p: d.label(c), i: U.fmt(P.Icmax, 'A') }));
+    st.ovV = ov; st.ovI = oi;
+  };
+}
+DEFS.npn.kw = (DEFS.npn.kw || '') + ' mje13001 mje13003 mje13005 13001 13003 13005 2n2222 s8050 bc547 2n3904 high-voltage 高压';
 for (const t of ['diode', 'npn', 'pnp', 'nmos', 'pmos', 'opamp']) addPartPreset(t);
 
 function drawAxial(ctx, c, body, band, label, glass) {

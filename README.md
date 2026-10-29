@@ -626,3 +626,8 @@ Ohm's law · series and parallel bulbs · RC charging · LED + resistor · fuse 
   - Copy/paste uses an in-app clipboard (also kept in `localStorage`, so it works across tabs of the same browser), not the system clipboard.
   - Parts selected while plugged into an *unselected* breadboard leave the board when moved, exactly as a single part does.
   - Auto-merge only joins wire ends at free points; a wire end lying on the middle of another wire is still joined by splitting (as before), and wires that cross without an end are never connected.
+
+### v15.2 — high-voltage NPN presets
+- NPN part selector now offers **MJE13001 / MJE13003 / MJE13005** (search "13001", "13003", "13005"): low β (25 / 20 / 15), V<sub>CEO</sub> 400 V, I<sub>C</sub> max 0.2 / 1.5 / 4 A.
+- New BJT rating fields *Vceo* and *Ic max* (0 = no limit): exceeding them shows a breakdown / overload toast and a ⚠ line in the readings.
+- Example **hvsw**: a 13003 switches 300 V DC into a 3 kΩ load from a 5 V base drive. Tests: `tests/test19.js`; screenshots 124–126 (`tests/shots18.js`).
