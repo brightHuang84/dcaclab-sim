@@ -150,7 +150,8 @@ Object.assign(app, {
       if (c.type === 'npn' || c.type === 'pnp') {
         h += _t('ui.collector_current_ic') + U.fmt(z(m.I, 1e-9), 'A') + _t('ui.base_current_ib') + U.fmt(z(m.Ib, 1e-10), 'A') + '</b></div>' +
           '<div>Vce<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div><div>Vbe<b>' + U.fmt(z(m.Vbe, 1e-6), 'V') + '</b></div>' +
-          '<div>Ic/Ib<b>' + (Math.abs(m.Ib) > 1e-10 ? (m.I / m.Ib).toFixed(1) : '—') + _t('ui.state') + this.bjtRegion(c) + '</b></div>';
+          '<div>Ic/Ib<b>' + (Math.abs(m.Ib) > 1e-10 ? (m.I / m.Ib).toFixed(1) : '—') + _t('ui.state') + this.bjtRegion(c) + '</b></div>'
+        if (c.state.ovV || c.state.ovI) h += '<div class="bjt-warn" style="color:#d62828"><b>⚠ ' + (c.state.ovV ? _t('bjt.warn_v') : _t('bjt.warn_i')) + '</b></div>';
       } else if (c.type === 'nmos') {
         h += _t('ui.drain_current_id') + U.fmt(z(m.I, 1e-9), 'A') + '</b></div><div>Vgs<b>' + U.fmt(z(m.Vgs, 1e-6), 'V') + '</b></div><div>Vds<b>' + U.fmt(z(m.V, 1e-6), 'V') + '</b></div>';
       } else if (c.type === 'ic555') {
