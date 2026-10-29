@@ -170,7 +170,7 @@ function drawScopeFFT(ctx, c, x, y, w, h, big, fs) {
 }
 
 const TDIV_OPTS = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1].map(v => [v, U.fmtShort(v, 's') + '/div']);
-const VDIV_OPTS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20].map(v => [v, U.fmtShort(v, 'V') + '/div']);
+const VDIV_OPTS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].map(v => [v, U.fmtShort(v, 'V') + '/div']);
 
 // ---- breadboard geometry ----
 const BB_ROWS = [[-8, 'T1'], [-7, 'T2'], [-5, 'A'], [-4, 'A'], [-3, 'A'], [-2, 'A'], [-1, 'A'], [1, 'B'], [2, 'B'], [3, 'B'], [4, 'B'], [5, 'B'], [7, 'B1'], [8, 'B2']];
